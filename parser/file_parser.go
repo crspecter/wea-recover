@@ -4,8 +4,6 @@ import (
 	"github.com/go-mysql-org/go-mysql/replication"
 )
 
-var EventChan chan (*replication.BinlogEvent)
-
 func WeaFileEventParser(event *replication.BinlogEvent) error {
 	EventChan <- event
 	return nil
