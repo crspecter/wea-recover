@@ -1,0 +1,10 @@
+/*.pid
+/start.sh
+.idea/
+/.vscode
+/*.exe
+/version
+/log/
+/.idea/
+/*.log
+/build/
