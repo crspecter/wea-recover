@@ -10,7 +10,7 @@ type InputInfo struct {
 	BinlogPath    string
 	StartDatetime string
 	StopDatetime  string
-	StartPosition int64
-	StopPosition  int64
+	StartPosition uint32
+	StopPosition  uint32
 	Export        bool
 }

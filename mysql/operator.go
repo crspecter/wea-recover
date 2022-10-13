@@ -4,10 +4,12 @@ import (
 	"context"
 	"fmt"
 	"github.com/go-mysql-org/go-mysql/client"
+	"sync"
 	"time"
 )
 
 var Pool *client.Pool
+var once sync.Once
 
 type DBConfig struct {
 	Addr     string
@@ -17,9 +19,11 @@ type DBConfig struct {
 }
 
 func NewConnPool(cfg DBConfig) {
-	Pool = client.NewPool(func(format string, args ...interface{}) {
-		println(fmt.Sprint(args)) // 增加日志方法
-	}, 1, 5, 5, cfg.Addr, cfg.User, cfg.Password, cfg.DBName)
+	once.Do(func() {
+		Pool = client.NewPool(func(format string, args ...interface{}) {
+			println(fmt.Sprint(args)) // 增加日志方法
+		}, 1, 5, 5, cfg.Addr, cfg.User, cfg.Password, cfg.DBName)
+	})
 }
 
 func GetShowCreateTableSql(tName string) (string, error) {

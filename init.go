@@ -19,8 +19,8 @@ func parseParam() def.InputInfo {
 	start_datetime := pflag.StringP("start-datetime", "", "", "恢复起始时间")
 	stop_datetime := pflag.StringP("stop-datetime", "", "", "恢复截止时间")
 
-	start_position := pflag.Int64P("start-position", "", 0, "恢复起始位点")
-	stop_position := pflag.Int64P("stop-position", "", 0, "恢复截止位点")
+	start_position := pflag.Uint32P("start-position", "", 0, "恢复起始位点")
+	stop_position := pflag.Uint32P("stop-position", "", 0, "恢复截止位点")
 	export := pflag.Bool("export", false, "是否导出表到当前目录下export.sql文件中")
 	pflag.Parse()
 
@@ -48,15 +48,18 @@ func initEnv() error {
 
 func run(param def.InputInfo) {
 	var err error
-	if param.Binlog != "" { //dump模式:从mysql实例中恢复数据
-		err = service.RecoverFromDump()
-	} else if param.BinlogPath != "" { //文件模式:从binlog文件中恢复数据
-		err = service.RecoverFromFile()
+	if param.Binlog != "" || param.BinlogPath != "" {
+		r := service.NewRecover(param)
+		if r == nil {
+			err = fmt.Errorf("new recover fail")
+		} else {
+			err = r.Run()
+		}
 	}
 
 	//导出sql
 	if err == nil && param.Export {
-		err = service.Export()
+		err = service.Export(param)
 	}
 
 	if err != nil {
