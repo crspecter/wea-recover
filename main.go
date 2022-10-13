@@ -17,10 +17,9 @@ func main() {
 	log.Println(os.Args)
 	log.Println("version:", Branch, CommitId, Message)
 
-	param := parseParam()
-
-	err := initEnv()
+	param, err := parseParam()
 	if err != nil {
+		fmt.Println(err)
 		log.Fatal(err)
 	}
 

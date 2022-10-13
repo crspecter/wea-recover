@@ -9,10 +9,9 @@ import (
 )
 
 type Recover struct {
-	binlog    parser
-	eventChan chan *replication.BinlogEvent
-	conn      db
-	filter    filter
+	binlog parser
+	conn   db
+	filter filter
 }
 
 // 数据恢复器创建
@@ -43,8 +42,7 @@ func NewRecover(param def.InputInfo) *Recover {
 
 	// 3.返回recover
 	return &Recover{
-		eventChan: make(chan *replication.BinlogEvent, 10),
-		filter:    f,
+		filter: f,
 		conn: db{
 			addr:  param.Addr,
 			port:  param.Port,
@@ -57,36 +55,32 @@ func NewRecover(param def.InputInfo) *Recover {
 
 // 执行数据恢复
 func (r *Recover) Run() error {
-	go func() {
-		for {
-			r.eventChan <- r.binlog.GetEvent()
-		}
-	}()
-
-	return r.recoverData()
-}
-
-func (r *Recover) recoverData() error {
-	for true {
-		// 1.获取到事件
-		event := <-r.eventChan
-
-		// 2.判断是否终止
-		if r.filter.stopPosition != 0 && event.Header.LogPos > r.filter.stopPosition {
-			log.Println("recover end by stop pos:", r.filter.stopPosition)
-			return nil
-		}
-		if r.filter.stopDatetime != nil && int64(event.Header.Timestamp) > r.filter.stopDatetime.Unix() {
-			log.Println("recover end by stop datetime:", r.filter.stopDatetime)
-			return nil
-		}
-
-		// 3.解析事件(过滤事件, 恢复数据)
-		err := r.parseEvent(event)
+	for {
+		err := r.recoverData(r.binlog.GetEvent())
 		if err != nil {
 			return err
 		}
 	}
+	return nil
+}
+
+func (r *Recover) recoverData(ev *replication.BinlogEvent) error {
+	// 2.判断是否终止
+	if r.filter.stopPosition != 0 && ev.Header.LogPos > r.filter.stopPosition {
+		log.Println("recover end by stop pos:", r.filter.stopPosition)
+		return nil
+	}
+	if r.filter.stopDatetime != nil && int64(ev.Header.Timestamp) > r.filter.stopDatetime.Unix() {
+		log.Println("recover end by stop datetime:", r.filter.stopDatetime)
+		return nil
+	}
+
+	// 3.解析事件(过滤事件, 恢复数据)
+	err := r.parseEvent(ev)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
