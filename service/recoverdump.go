@@ -117,7 +117,9 @@ type db struct {
 }
 
 type filter struct {
+	startFile     string
 	startPosition uint32
+	stopFile      string
 	stopPosition  uint32
 	startDatetime *time.Time
 	stopDatetime  *time.Time
