@@ -26,6 +26,13 @@ func checkExportParam(param def.InputInfo) error {
 }
 
 func export(param def.InputInfo) error {
+	//重建恢复文件
+	DeleteFile("./", param.Table+"_recover"+".sql")
+	file, ef := CreateAndTruncate("./" + param.Table + "_recover" + ".sql")
+	if ef != nil {
+		return ef
+	}
+	file.Close()
 	//链接测试库
 	conn_src, err := client.Connect(param.Addr+":"+strconv.Itoa(param.Port), param.User, param.Pwd, "test")
 	if err != nil {
@@ -70,6 +77,7 @@ func export(param def.InputInfo) error {
 	stmt, err := conn_src.Prepare(pSql)
 
 	nowID := minId - 1
+	//查询主循环
 	for nowID >= minId && nowID <= maxId {
 
 		ret, eq := stmt.Execute(nowID, maxId)
@@ -78,12 +86,14 @@ func export(param def.InputInfo) error {
 			return err
 		}
 
-		var fRsl []string
+		var oneSelect []string
 		for _, cv := range ret.Values {
+			var lineValue string
+			var lineTmp []string
 			for i, v := range cv {
 
 				value := mysql.ConvertToSqlValueString(v.AsString(), table.Columns[i].RawType)
-				fRsl = append(fRsl, value)
+				lineTmp = append(lineTmp, value)
 				if table.Columns[i].Name == table.GetPKColumn(0).Name {
 					id, err := strconv.ParseUint(value, 10, 64)
 					if err != nil {
@@ -93,9 +103,13 @@ func export(param def.InputInfo) error {
 					nowID = int64(id)
 				}
 			}
+			lineValue = fmt.Sprintf("(%v)", strings.Join(lineTmp, ","))
+			oneSelect = append(oneSelect, lineValue)
 		}
 		//写入文件
-
+		sql := toSQL("test."+table.Name+"_recover", fields_sql, oneSelect)
+		file.WriteString(sql)
+		file.Sync()
 	}
 
 	return nil
@@ -125,4 +139,8 @@ func getMinID(tName string, pk string) (int64, error) {
 	}
 	return rsl, err
 
+}
+
+func toSQL(table string, field string, value []string) string {
+	return fmt.Sprintf("replace into `%s` %s values %s", table, field, strings.Join(value, ",\n"))
 }
