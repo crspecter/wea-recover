@@ -2,10 +2,14 @@ package service
 
 import (
 	"fmt"
+	"github.com/go-mysql-org/go-mysql/mysql"
 	"github.com/go-mysql-org/go-mysql/replication"
 	"log"
+	"math/rand"
+	"strings"
 	"time"
 	"wea-recover/common/def"
+	parser2 "wea-recover/parser"
 )
 
 type Recover struct {
@@ -19,7 +23,7 @@ func NewRecover(param def.InputInfo) *Recover {
 	// 1.参数检查
 	err := check(param)
 	if err != nil {
-		log.Println("err:", err)
+		log.Println("E err:", err)
 		return nil
 	}
 
@@ -40,6 +44,31 @@ func NewRecover(param def.InputInfo) *Recover {
 		f.stopDatetime = &t
 	}
 
+	// 3.构造parser
+	var binlog parser
+	if strings.TrimSpace(param.Binlog) != "" {
+		cfg := replication.BinlogSyncerConfig{
+			ServerID:        rand.New(rand.NewSource(time.Now().UnixNano())).Uint32(),
+			Host:            param.Addr,
+			Port:            uint16(param.Port),
+			User:            param.User,
+			Password:        param.Pwd,
+			RecvBufferSize:  1024 * 1024,
+			HeartbeatPeriod: time.Second * 30,
+		}
+		pos := mysql.Position{
+			Name: param.Binlog,
+			Pos:  param.StartPosition,
+		}
+		binlog = NewDumpParser(cfg, pos)
+	} else {
+		binlog = NewFileParser(strings.Split(param.BinlogPath, ","), int64(param.StartPosition))
+	}
+	if binlog == nil {
+		log.Println("E 构造binlog parser失败:", err)
+		return nil
+	}
+
 	// 3.返回recover
 	return &Recover{
 		filter: f,
@@ -50,6 +79,7 @@ func NewRecover(param def.InputInfo) *Recover {
 			db:    param.Db,
 			table: param.Table,
 		},
+		binlog: binlog,
 	}
 }
 
@@ -61,10 +91,13 @@ func (r *Recover) Run() error {
 			return err
 		}
 	}
-	return nil
 }
 
 func (r *Recover) recoverData(ev *replication.BinlogEvent) error {
+	if ev == nil {
+		return fmt.Errorf("解析binlog事件失败")
+	}
+
 	// 2.判断是否终止
 	if r.filter.stopPosition != 0 && ev.Header.LogPos > r.filter.stopPosition {
 		log.Println("recover end by stop pos:", r.filter.stopPosition)
@@ -103,9 +136,59 @@ type parser interface {
 }
 
 type fileParser struct {
+	binlogs  []string
+	startPos int64
+	curPos   int
 }
 
-type dumpParser struct {
+func NewFileParser(binlogs []string, startPos int64) *fileParser {
+	if len(binlogs) < 1 {
+		log.Println("E binlogs empty")
+		return nil
+	}
+	err := parser2.RunParser(binlogs[0], startPos)
+	if err != nil {
+		log.Println("E RunParser err:", err)
+		return nil
+	}
+	return &fileParser{
+		binlogs:  binlogs,
+		startPos: startPos,
+		curPos:   0,
+	}
+}
+
+func (f *fileParser) GetEvent() *replication.BinlogEvent {
+	event := parser2.GetFileEvent()
+	switch event.Event.(type) {
+	case *replication.RotateEvent:
+		f.curPos++
+		if len(f.binlogs)-1 < f.curPos {
+			log.Println("I file end")
+			return nil
+		}
+		log.Println("I exchange file:", f.binlogs[f.curPos])
+		err := parser2.RunParser(f.binlogs[f.curPos], 0)
+		if err != nil {
+			log.Println("E RunParser err:", err)
+		}
+	}
+	return parser2.GetFileEvent()
+}
+
+type dumpParser struct{}
+
+func NewDumpParser(cfg replication.BinlogSyncerConfig, pos mysql.Position) *dumpParser {
+	err := parser2.RunDumper(cfg, pos)
+	if err != nil {
+		log.Println("E RunDumper err:", err)
+		return nil
+	}
+	return &dumpParser{}
+}
+
+func (f *dumpParser) GetEvent() *replication.BinlogEvent {
+	return parser2.DumperGetEvent()
 }
 
 type db struct {

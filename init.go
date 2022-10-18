@@ -119,11 +119,11 @@ func run(param def.InputInfo) {
 func isFile(path string) bool {
 	file, err := os.Stat(path)
 	if err != nil {
-		log.Println("find file error ", err.Error())
+		log.Println("E find file error ", err.Error())
 		return false
 	}
 	if file.IsDir() {
-		log.Println("find dir not file ", path)
+		log.Println("E find dir not file ", path)
 		return false
 	}
 
