@@ -144,8 +144,8 @@ END:
 
 func (r *Recover) recoverData(ev *replication.BinlogEvent) (bool, error) {
 	if ev == nil {
-		log.Println("E 解析binlog事件失败")
-		return false, fmt.Errorf("解析binlog事件失败")
+		log.Println("I binlog文件列表解析结束")
+		return true, nil
 	}
 
 	// 2.判断是否终止
@@ -296,11 +296,10 @@ func NewFileParser(binlogs []string, startPos int64) *fileParser {
 
 func (f *fileParser) GetEvent() *replication.BinlogEvent {
 	event := parser2.GetFileEvent()
-	switch event.Event.(type) {
-	case *replication.RotateEvent:
+	if event.Header.Flags == 0xffff {
 		f.curPos++
 		if len(f.binlogs)-1 < f.curPos {
-			log.Println("I file end")
+			log.Println("I input file end")
 			return nil
 		}
 		log.Println("I exchange file:", f.binlogs[f.curPos])

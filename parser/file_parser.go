@@ -11,6 +11,7 @@ func WeaFileEventParser(event *replication.BinlogEvent) error {
 
 func RunParser(file string, offset int64) error {
 	parser := replication.NewBinlogParser()
+	EventDone = false
 	err := parser.ParseFile(file, offset, WeaFileEventParser)
 	if err != nil {
 		EventDone = true
@@ -23,7 +24,12 @@ func RunParser(file string, offset int64) error {
 
 func GetFileEvent() *replication.BinlogEvent {
 	if EventDone {
-		return nil
+		event := &replication.BinlogEvent{
+			Header: &replication.EventHeader{
+				Flags: 0xffff,
+			},
+		}
+		return event
 	} else {
 		e := <-EventChan
 		return e
