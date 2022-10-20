@@ -10,6 +10,7 @@ import (
 
 var Pool *client.Pool
 var once sync.Once
+var TestDBPool *client.Pool
 
 type DBConfig struct {
 	Addr     string
@@ -23,6 +24,14 @@ func NewConnPool(cfg DBConfig) {
 		Pool = client.NewPool(func(format string, args ...interface{}) {
 			println(fmt.Sprint(args)) // 增加日志方法
 		}, 1, 5, 5, cfg.Addr, cfg.User, cfg.Password, cfg.DBName)
+	})
+}
+
+func NewConnTestPool(cfg DBConfig) {
+	once.Do(func() {
+		TestDBPool = client.NewPool(func(format string, args ...interface{}) {
+			println(fmt.Sprint(args)) // 增加日志方法
+		}, 1, 5, 5, cfg.Addr, cfg.User, cfg.Password, "test")
 	})
 }
 
@@ -43,6 +52,18 @@ func Execute(stmt string) error {
 		return err
 	}
 	defer Pool.PutConn(conn)
+	_, err = conn.Execute(stmt)
+	return err
+}
+
+func ExecuteTestDB(stmt string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
+	defer cancel()
+	conn, err := TestDBPool.GetConn(ctx)
+	if err != nil {
+		return err
+	}
+	defer TestDBPool.PutConn(conn)
 	_, err = conn.Execute(stmt)
 	return err
 }

@@ -9,6 +9,7 @@ import (
 	"log"
 	"math/rand"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -81,6 +82,23 @@ func NewRecover(param def.InputInfo) *Recover {
 		log.Println("E 打开文件失败:", err)
 		return nil
 	}
+	//构建链接需要恢复数据库连接池
+	mysql2.NewConnPool(mysql2.DBConfig{
+		Addr:     param.Addr + ":" + strconv.Itoa(param.Port),
+		User:     param.User,
+		Password: param.Pwd,
+		DBName:   param.Db,
+	})
+
+	//TODO 获取表结构,创建test库, table_recover表,清空表@hao.hu
+
+	// 创建执行sql的连接池test库连接池
+	mysql2.NewConnTestPool(mysql2.DBConfig{
+		Addr:     param.Addr + ":" + strconv.Itoa(param.Port),
+		User:     param.User,
+		Password: param.Pwd,
+		DBName:   "test",
+	})
 
 	// 3.返回recover
 	return &Recover{
@@ -126,6 +144,7 @@ func (r *Recover) Run() error {
 }
 
 func (r *Recover) write() {
+
 	r.wg.Add(1)
 	for {
 		select {
@@ -133,8 +152,16 @@ func (r *Recover) write() {
 			if !ok {
 				goto END
 			}
-			sql.ToSql()
-			log.Println(sql)
+			//修改写入test库的表名称为xxx_recover
+			tName := sql.TName + "_recover"
+			sql.TName = tName
+			sqlCmd := sql.ToSql()
+			//写入
+			err := mysql2.ExecuteTestDB(sqlCmd)
+			if err != nil {
+				log.Println("写入恢复库执行sql失败:", err.Error())
+			}
+			log.Println(sqlCmd)
 		}
 	}
 
