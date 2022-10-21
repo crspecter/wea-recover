@@ -83,24 +83,7 @@ func (s *SqlAttr) Merge(a *SqlAttr) bool {
 }
 
 func (s *SqlAttr) ToSql() string {
-	//fmt.Println(s.SqlType, "-", len(s.Value))
-	switch s.SqlType {
-	case SqlTypeUpdateOrInsert:
-		return fmt.Sprintf("insert ignore into `%s` %s values %s", s.TName, s.Field, strings.Join(s.Value, ","))
-	case SqlTypeDelete:
-		return fmt.Sprintf("delete from `%s` where %s", s.TName, strings.Join(s.Value, " or "))
-	case SqlTypeDDL:
-		return strings.Join(s.Value, " ")
-	case SqlSafeFullStageInsert:
-		return fmt.Sprintf("/*!99999 WEA-RECOVER */ insert ignore into `%s` %s values %s", s.TName, s.Field, strings.Join(s.Value, ","))
-	case SqlSafeInsert:
-		return fmt.Sprintf("/*!99999 WEA-RECOVER */ insert ignore into `%s` %s values %s", s.TName, s.Field, strings.Join(s.Value, ","))
-	case SqlSafeUpdate:
-		return "/*!99999 WEA-RECOVER */ " + strings.Join(s.Value, " ")
-	case SqlSafeDelete:
-		return fmt.Sprintf("/*!99999 WEA-RECOVER */ delete from `%s` where %s", s.TName, strings.Join(s.Value, " or "))
-	}
-	return ""
+	return fmt.Sprintf("replace into `%s` %s values %s", s.TName, s.Field, strings.Join(s.Value, ","))
 }
 
 func HandleUpdateEvent(rows [][]interface{}, table *schema.Table, sqlType SqlType) (sql []*SqlAttr, match bool, err error) {

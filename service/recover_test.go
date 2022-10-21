@@ -1,6 +1,8 @@
 package service
 
-import "testing"
+import (
+	"testing"
+)
 
 func TestDb_GetSchema(t *testing.T) {
 	ch := make(chan int, 10)
