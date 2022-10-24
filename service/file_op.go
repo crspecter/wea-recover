@@ -2,6 +2,8 @@ package service
 
 import (
 	"os"
+	"sort"
+	"strings"
 )
 
 var FILE_NAME = "data.xtream"
@@ -58,4 +60,44 @@ func IsFile(path string) bool {
 	}
 
 	return true
+}
+
+type DirEntrys []os.DirEntry
+
+func (f DirEntrys) Len() int {
+	return len(f)
+}
+
+func (f DirEntrys) Less(i, j int) bool {
+	ret := strings.Compare(f[i].Name(), f[j].Name())
+	if ret == 0 {
+		return true
+	} else if ret < 0 {
+		return true
+	} else {
+		return false
+	}
+}
+
+func (f DirEntrys) Swap(i, j int) {
+	f[i], f[j] = f[j], f[i]
+}
+
+func ListFile(path string) ([]os.DirEntry, error) {
+	var files DirEntrys
+	dir, err := os.ReadDir(path)
+	if err != nil {
+		return nil, err
+	}
+	for _, f := range dir {
+		if f.IsDir() {
+			continue
+		}
+		name := f.Name()
+		strings.HasPrefix(name, "mysql-bin.")
+		files = append(files, f)
+		sort.Sort(files)
+	}
+	return files, nil
+
 }
