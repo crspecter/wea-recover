@@ -43,7 +43,7 @@ func parseParam() (def.InputInfo, error) {
 	*stop_position = strings.TrimSpace(*stop_position)
 
 	path := *binlog_path
-	if path != "" && path[len(path)-1] != '/' {
+	if path != "" && path[len(path)-1] != '/' && path[len(path)-1] != '\\' {
 		path += "/"
 	}
 
@@ -120,11 +120,15 @@ func parseParam() (def.InputInfo, error) {
 		if end == -1 {
 			end = len(files) - 1
 		}
+		if start > end {
+			return def.InputInfo{}, fmt.Errorf("开始binlog大于数据binlog:%s - %s", *start_position, *stop_position)
+		}
 
 		//筛选出待解析的binlog及位点信息
 		for i := start; i <= end; i++ {
-			if i == start {
-				var binPos def.BinlogPos
+			var binPos def.BinlogPos
+
+			if start == end {
 				binPos.Binlog = path + startPos[0]
 				if len(startPos) > 1 {
 					num, err := strconv.Atoi(startPos[1])
@@ -134,9 +138,7 @@ func parseParam() (def.InputInfo, error) {
 					binPos.Pos = uint32(num)
 				}
 				binlogs = append(binlogs, binPos)
-				continue
-			} else if i == end {
-				var binPos def.BinlogPos
+
 				binPos.Binlog = path + endPos[0]
 				if len(endPos) > 1 {
 					num, err := strconv.Atoi(endPos[1])
@@ -146,14 +148,30 @@ func parseParam() (def.InputInfo, error) {
 					binPos.Pos = uint32(num)
 				}
 				binlogs = append(binlogs, binPos)
-				continue
+				break
 			}
 
+			if i == start {
+				if len(startPos) > 1 {
+					num, err := strconv.Atoi(startPos[1])
+					if err != nil {
+						return def.InputInfo{}, fmt.Errorf("解析开始位点失败:%s", *start_position)
+					}
+					binPos.Pos = uint32(num)
+				}
+			}
+			if i == end {
+				if len(endPos) > 1 {
+					num, err := strconv.Atoi(endPos[1])
+					if err != nil {
+						return def.InputInfo{}, fmt.Errorf("解析结束位点失败:%s", *stop_position)
+					}
+					binPos.Pos = uint32(num)
+				}
+			}
 			v := files[i]
-			var binPos def.BinlogPos
 			binPos.Binlog = path + v.Name()
 			binlogs = append(binlogs, binPos)
-
 		}
 		if len(binlogs) == 0 {
 			return def.InputInfo{}, fmt.Errorf("获取binlog列表失败")
@@ -194,9 +212,9 @@ func parseParam() (def.InputInfo, error) {
 				binlogs = append(binlogs, binPos)
 			}
 			if len(binlogs) == 0 {
-				return def.InputInfo{}, fmt.Errorf("获取binlog列表失败")
+				return def.InputInfo{}, fmt.Errorf("解析入参binlog失败")
 			}
-
+			//TODO:如果没有截止时间,没有截止位点,怎么退出?
 			ty = def.DUMP_RECOVER
 		}
 	}

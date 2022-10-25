@@ -96,7 +96,6 @@ func NewRecover(param def.InputInfo) *Recover {
 	}
 	err = conn.Init()
 	if err != nil {
-		common.Errorln("数据库初始化失败:", err)
 		return nil
 	}
 
@@ -121,20 +120,27 @@ func (r *Recover) Run() error {
 
 	go r.write()
 
+	var err error
 	for {
-		finish, err := r.recoverData(r.binlog.GetEvent())
+		var event *replication.BinlogEvent
+		event, err = r.binlog.GetEvent()
 		if err != nil {
-			close(r.ch)
-			r.wg.Wait()
-			return err
+			break
+		}
+
+		var finish bool
+		finish, err = r.recoverData(event)
+		if err != nil {
+			break
 		}
 		if finish {
-			close(r.ch)
-			r.wg.Wait()
-			common.Infoln("恢复完成")
-			return nil
+			break
 		}
 	}
+
+	close(r.ch)
+	r.wg.Wait()
+	return err
 }
 
 func (r *Recover) write() {
@@ -284,68 +290,101 @@ func (r *Recover) exportRawSql(sql []byte) {
 }
 
 type parser interface {
-	GetEvent() *replication.BinlogEvent
+	GetEvent() (*replication.BinlogEvent, error)
 }
 
 type fileParser struct {
 	binlogs []def.BinlogPos
 	curPos  int
+	parser  *replication.BinlogParser
+	err     error
 }
 
 func NewFileParser(binlogs []def.BinlogPos) *fileParser {
-	startPos := int64(binlogs[0].Pos)
 	if len(binlogs) < 1 {
 		common.Errorln("binlogs empty")
 		return nil
 	}
-	err := parser2.RunParser(binlogs[0].Binlog, startPos)
-	if err != nil {
-		common.Errorln("RunParser err:", err)
-		return nil
-	}
-	return &fileParser{
+	ret := &fileParser{
 		binlogs: binlogs,
 		curPos:  0,
+		parser:  replication.NewBinlogParser(),
 	}
+
+	err := ret.Init(ret.binlogs[0].Binlog, int64(ret.binlogs[0].Pos))
+	if err != nil {
+		return nil
+	}
+	return ret
 }
 
-func (f *fileParser) GetEvent() *replication.BinlogEvent {
+func (f *fileParser) Init(file string, offset int64) error {
+	f.err = nil
+	go func() {
+		err := parser2.RunParser(file, offset, f.parser)
+		if err != nil {
+			f.err = common.Error("RunParser err:", err)
+		} else {
+			common.Infoln("RunParser done")
+		}
+	}()
+	time.Sleep(time.Second)
+	return f.err
+}
+
+func (f *fileParser) GetEvent() (*replication.BinlogEvent, error) {
 	event := parser2.GetFileEvent()
 	if event.Header.Flags == 0xffff {
 		f.curPos++
 		if len(f.binlogs)-1 < f.curPos {
 			common.Infoln("input file end")
-			return nil
+			return nil, nil
 		}
 		common.Infoln("exchange file:", f.binlogs[f.curPos])
-		err := parser2.RunParser(f.binlogs[f.curPos].Binlog, 0)
+		err := f.Init(f.binlogs[f.curPos].Binlog, 0)
 		if err != nil {
 			common.Errorln("RunParser err:", err)
-			return nil
+			return nil, common.Error("RunParser err:", err)
 		}
 	} else if len(f.binlogs)-1 == f.curPos && f.binlogs[f.curPos].Pos != 0 {
 		//最后一个binlog,并且设置了截止位点
 		if event.Header.LogPos > f.binlogs[f.curPos].Pos {
 			common.Infoln("input file end")
-			return nil
+			return nil, nil
 		}
+	} else {
+		return event, nil
 	}
-	return parser2.GetFileEvent()
+	return parser2.GetFileEvent(), nil
 }
 
-type dumpParser struct{}
+type dumpParser struct {
+	streamer *replication.BinlogStreamer
+	err      error
+}
 
 func NewDumpParser(cfg replication.BinlogSyncerConfig, pos mysql.Position) *dumpParser {
-	err := parser2.RunDumper(cfg, pos)
-	if err != nil {
-		common.Errorln("RunParser err:", err)
+	syncer := replication.NewBinlogSyncer(cfg)
+	if syncer == nil {
+		common.Errorln("NewBinlogSyncer get syncer == nil")
 		return nil
 	}
-	return &dumpParser{}
+
+	streamer, err := syncer.StartSync(pos)
+	if err != nil {
+		common.Errorln("start sync err:", err)
+		return nil
+	}
+	return &dumpParser{streamer: streamer}
 }
 
-func (f *dumpParser) GetEvent() *replication.BinlogEvent {
-	return parser2.DumperGetEvent()
+func (f *dumpParser) GetEvent() (*replication.BinlogEvent, error) {
+	event, err := f.streamer.GetEvent(context.Background())
+	if err != nil {
+		common.Errorln("GetEvent err:", err)
+		return nil, err
+	}
+	return event, nil
 }
 
 type db struct {
@@ -376,17 +415,16 @@ func (d *db) Init() error {
 		Addr:     d.addr + ":" + strconv.Itoa(d.port),
 		User:     d.user,
 		Password: d.pwd,
-		DBName:   "test",
 	})
 	d.TestDBPool = mysql2.TestDBPool
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
-	conn, err := d.TestDBPool.GetConn(ctx)
+	conn, err := d.clientPool.GetConn(ctx)
 	if err != nil {
 		return common.Error("GetConn err:", err)
 	}
-	defer d.TestDBPool.PutConn(conn)
+	defer d.clientPool.PutConn(conn)
 	_, err = conn.Execute("CREATE DATABASE IF NOT EXISTS test;")
 	if err != nil {
 		return common.Error("CREATE DATABASE test err:", err)
@@ -403,7 +441,7 @@ func (d *db) Init() error {
 	}
 
 	//创建test表
-	sql = strings.Replace(sql, fmt.Sprintf("CREATE TABLE IF NOT EXISTS `%s`", d.table), fmt.Sprintf("CREATE TABLE IF NOT EXISTS `%s`", d.table+"_recover"), 1)
+	sql = strings.Replace(sql, fmt.Sprintf("CREATE TABLE IF NOT EXISTS `%s`", d.table), fmt.Sprintf("CREATE TABLE IF NOT EXISTS `test`.`%s`", d.table+"_recover"), 1)
 	var rsl *mysql.Result
 	rsl, err = conn.Execute(sql)
 	if err != nil {
@@ -411,7 +449,7 @@ func (d *db) Init() error {
 	}
 	rsl.Close()
 
-	sql = fmt.Sprintf("DROP TABLE `%s`", d.table+"_recover")
+	sql = fmt.Sprintf("TRUNCATE TABLE `test`.`%s`", d.table+"_recover")
 	_, err = conn.Execute(sql)
 	if err != nil {
 		return common.Error("清空表语句执行失败 err:", err)

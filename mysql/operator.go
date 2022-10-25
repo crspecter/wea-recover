@@ -9,8 +9,9 @@ import (
 )
 
 var Pool *client.Pool
-var once sync.Once
+var oncePool sync.Once
 var TestDBPool *client.Pool
+var onceTestDBPool sync.Once
 
 type DBConfig struct {
 	Addr     string
@@ -20,7 +21,7 @@ type DBConfig struct {
 }
 
 func NewConnPool(cfg DBConfig) {
-	once.Do(func() {
+	oncePool.Do(func() {
 		Pool = client.NewPool(func(format string, args ...interface{}) {
 			println(fmt.Sprint(args)) // 增加日志方法
 		}, 1, 5, 5, cfg.Addr, cfg.User, cfg.Password, cfg.DBName)
@@ -28,7 +29,7 @@ func NewConnPool(cfg DBConfig) {
 }
 
 func NewConnTestPool(cfg DBConfig) {
-	once.Do(func() {
+	onceTestDBPool.Do(func() {
 		TestDBPool = client.NewPool(func(format string, args ...interface{}) {
 			println(fmt.Sprint(args)) // 增加日志方法
 		}, 1, 5, 5, cfg.Addr, cfg.User, cfg.Password, "test")

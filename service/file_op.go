@@ -94,10 +94,11 @@ func ListFile(path string) ([]os.DirEntry, error) {
 			continue
 		}
 		name := f.Name()
-		strings.HasPrefix(name, "mysql-bin.")
-		files = append(files, f)
-		sort.Sort(files)
+		if strings.HasPrefix(name, "mysql-bin.") || strings.HasPrefix(name, "binlog.0") {
+			files = append(files, f)
+		}
 	}
+	sort.Sort(files)
 	return files, nil
 
 }
