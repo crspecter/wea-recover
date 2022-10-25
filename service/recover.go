@@ -8,7 +8,6 @@ import (
 	"github.com/go-mysql-org/go-mysql/mysql"
 	"github.com/go-mysql-org/go-mysql/replication"
 	"github.com/go-mysql-org/go-mysql/schema"
-	"log"
 	"math/rand"
 	"os"
 	"strconv"
@@ -41,7 +40,7 @@ func NewRecover(param def.InputInfo) *Recover {
 	}
 
 	// 2.构造过滤器
-	f := filter{db: param.Db, table: param.Table, stopPosition: param.StopPosition, startPosition: param.StartPosition}
+	f := filter{db: param.Db, table: param.Table, binlogs: param.Binlogs, ty: param.Ty, isLastBinlog: false}
 	if param.StartDatetime == "" {
 		f.startDatetime = nil
 	} else {
@@ -57,7 +56,7 @@ func NewRecover(param def.InputInfo) *Recover {
 
 	// 3.构造parser
 	var binlog parser
-	if strings.TrimSpace(param.Binlog) != "" {
+	if param.Ty == def.DUMP_RECOVER {
 		cfg := replication.BinlogSyncerConfig{
 			ServerID:        rand.New(rand.NewSource(time.Now().UnixNano())).Uint32(),
 			Host:            param.Addr,
@@ -68,12 +67,12 @@ func NewRecover(param def.InputInfo) *Recover {
 			HeartbeatPeriod: time.Second * 30,
 		}
 		pos := mysql.Position{
-			Name: param.Binlog,
-			Pos:  param.StartPosition,
+			Name: param.Binlogs[0].Binlog,
+			Pos:  param.Binlogs[0].Pos,
 		}
 		binlog = NewDumpParser(cfg, pos)
-	} else {
-		binlog = NewFileParser(strings.Split(param.BinlogPath, ","), int64(param.StartPosition))
+	} else if param.Ty == def.FILE_RECOVER {
+		binlog = NewFileParser(param.Binlogs)
 	}
 	if binlog == nil {
 		common.Errorln("构造binlog parser失败:", err)
@@ -289,25 +288,24 @@ type parser interface {
 }
 
 type fileParser struct {
-	binlogs  []string
-	startPos int64
-	curPos   int
+	binlogs []def.BinlogPos
+	curPos  int
 }
 
-func NewFileParser(binlogs []string, startPos int64) *fileParser {
+func NewFileParser(binlogs []def.BinlogPos) *fileParser {
+	startPos := int64(binlogs[0].Pos)
 	if len(binlogs) < 1 {
 		common.Errorln("binlogs empty")
 		return nil
 	}
-	err := parser2.RunParser(binlogs[0], startPos)
+	err := parser2.RunParser(binlogs[0].Binlog, startPos)
 	if err != nil {
 		common.Errorln("RunParser err:", err)
 		return nil
 	}
 	return &fileParser{
-		binlogs:  binlogs,
-		startPos: startPos,
-		curPos:   0,
+		binlogs: binlogs,
+		curPos:  0,
 	}
 }
 
@@ -320,9 +318,15 @@ func (f *fileParser) GetEvent() *replication.BinlogEvent {
 			return nil
 		}
 		common.Infoln("exchange file:", f.binlogs[f.curPos])
-		err := parser2.RunParser(f.binlogs[f.curPos], 0)
+		err := parser2.RunParser(f.binlogs[f.curPos].Binlog, 0)
 		if err != nil {
 			common.Errorln("RunParser err:", err)
+			return nil
+		}
+	} else if len(f.binlogs)-1 == f.curPos && f.binlogs[f.curPos].Pos != 0 {
+		//最后一个binlog,并且设置了截止位点
+		if event.Header.LogPos > f.binlogs[f.curPos].Pos {
+			common.Infoln("input file end")
 			return nil
 		}
 	}
@@ -520,14 +524,13 @@ func (d *db) GetSchema() *schema.Table {
 }
 
 type filter struct {
-	startFile     string
-	startPosition uint32
-	stopFile      string
-	stopPosition  uint32
+	ty            def.RecoverType
+	binlogs       []def.BinlogPos
 	startDatetime *time.Time
 	stopDatetime  *time.Time
 	db            string
 	table         string
+	isLastBinlog  bool
 }
 
 func (f filter) Valid(event *replication.BinlogEvent) bool {
@@ -555,18 +558,41 @@ func (f filter) Valid(event *replication.BinlogEvent) bool {
 			return false
 		}
 	case *replication.RotateEvent:
-		common.Infoln("rotate binlog:", ev.NextLogName, ev.Position)
+		common.Infoln("rotate binlog:", string(ev.NextLogName), ev.Position)
 		return false
 	default:
 		return false
 	}
 }
 
-func (f filter) IsFinish(ev *replication.BinlogEvent) bool {
-	if f.stopPosition != 0 && ev.Header.LogPos > f.stopPosition {
-		common.Infoln("recover end by stop pos:", f.stopPosition)
-		return true
+func (f *filter) IsFinish(ev *replication.BinlogEvent) bool {
+	//if f.stopPosition != 0 && ev.Header.LogPos > f.stopPosition {
+	//	common.Infoln("recover end by stop pos:", f.stopPosition)
+	//	return true
+	//}
+
+	//是否为最后一个binlog
+	if f.ty == def.DUMP_RECOVER && len(f.binlogs) == 2 && f.isLastBinlog == false {
+		switch e := ev.Event.(type) {
+		case *replication.RotateEvent:
+			if string(e.NextLogName) == f.binlogs[1].Binlog {
+				f.isLastBinlog = true
+				return false
+			}
+		}
 	}
+
+	//最后一个binlog, 对比截止位点
+	if f.isLastBinlog {
+		_, ok := ev.Event.(*replication.RotateEvent)
+		if f.binlogs[1].Pos == 0 && ok {
+			return true
+		}
+		if f.binlogs[1].Pos != 0 && ev.Header.LogPos > f.binlogs[1].Pos {
+			return true
+		}
+	}
+
 	if f.stopDatetime != nil && int64(ev.Header.Timestamp) > f.stopDatetime.Unix() {
 		common.Infoln("recover end by stop datetime:", f.stopDatetime)
 		return true

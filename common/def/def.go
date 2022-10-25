@@ -7,11 +7,23 @@ type InputInfo struct {
 	Pwd           string
 	Db            string
 	Table         string
-	Binlog        string
-	BinlogPath    string
+	Binlogs       []BinlogPos
 	StartDatetime string
 	StopDatetime  string
-	StartPosition uint32
-	StopPosition  uint32
 	Export        bool
+	Ty            RecoverType
+}
+
+type RecoverType int
+
+const (
+	UNKNOWN      RecoverType = -1
+	FILE_RECOVER RecoverType = 0
+	DUMP_RECOVER RecoverType = 1
+	EXPORT_ONLY  RecoverType = 2
+)
+
+type BinlogPos struct {
+	Binlog string
+	Pos    uint32
 }

@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"time"
+	"wea-recover/common"
 )
 
 // 用于表示自己的版本信息
@@ -14,8 +15,8 @@ var Message string
 
 func main() {
 	now := time.Now()
-	log.Println(os.Args)
-	log.Println("version:", Branch, CommitId, Message)
+	common.Infoln(os.Args)
+	common.Infoln("version:", Branch, CommitId, Message)
 
 	param, err := parseParam()
 	if err != nil {
@@ -24,7 +25,7 @@ func main() {
 	}
 
 	run(param)
-	log.Println("恢复完成, 耗时:", time.Now().Sub(now))
+	common.Infoln("恢复完成, 耗时:", time.Now().Sub(now))
 	fmt.Println("恢复完成, 耗时:", time.Now().Sub(now))
 }
 
