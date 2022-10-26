@@ -194,7 +194,7 @@ func findRowToDelete(rows []interface{}, table *schema.Table, builder *strings.B
 		if table.Columns[i].Type == schema.TYPE_NUMBER && table.Columns[i].IsUnsigned {
 			row = signedToUnsigned(row)
 		}
-		value, _ := parseNumber(row)
+		value, _ := ParseNumber(row)
 
 		builder.WriteString(" and `")
 		builder.WriteString(table.Columns[i].Name)
@@ -263,7 +263,7 @@ func findRowAllValues(cols []interface{}, table *schema.Table, builder *strings.
 		if table.Columns[i].Type == schema.TYPE_NUMBER && table.Columns[i].IsUnsigned {
 			col = signedToUnsigned(col)
 		}
-		value, isNumber := parseNumber(col)
+		value, isNumber := ParseNumber(col)
 		if isNumber {
 			more = ""
 		}

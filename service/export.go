@@ -123,7 +123,7 @@ func export(param def.InputInfo) error {
 		}
 		//写入文件
 		sql := toSQL("test."+table.Name+"_recover", fields_sql, oneSelect)
-		file.WriteString(sql)
+		file.WriteString(sql + "\n")
 		file.Sync()
 		ret.Close()
 	}
@@ -158,5 +158,5 @@ func getMinID(tName string, pk string) (int64, error) {
 }
 
 func toSQL(table string, field string, value []string) string {
-	return fmt.Sprintf("replace into `%s` %s values %s", table, field, strings.Join(value, ",\n"))
+	return fmt.Sprintf("replace into `%s` %s values %s", table, field, strings.Join(value, ","))
 }
