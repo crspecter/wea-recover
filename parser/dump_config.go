@@ -4,7 +4,6 @@ import "github.com/go-mysql-org/go-mysql/replication"
 
 var EventChan = make(chan *replication.BinlogEvent)
 var FileEventChan chan *replication.BinlogEvent
-var EventDone bool = false
 
 type MysqlSyncConfig struct {
 	SourceAddr     string
