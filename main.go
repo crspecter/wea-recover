@@ -15,7 +15,7 @@ var Message string
 
 func main() {
 	now := time.Now()
-	common.Infoln(os.Args)
+	common.Infoln("param:", os.Args)
 	common.Infoln("version:", Branch, CommitId, Message)
 
 	param, err := parseParam()

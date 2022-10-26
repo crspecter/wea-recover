@@ -33,6 +33,7 @@ type Recover struct {
 // 数据恢复器创建
 func NewRecover(param def.InputInfo) *Recover {
 	// 1.参数检查
+	common.Infoln("check param")
 	err := check(param)
 	if err != nil {
 		common.Errorln(err)
@@ -40,6 +41,7 @@ func NewRecover(param def.InputInfo) *Recover {
 	}
 
 	// 2.构造过滤器
+	common.Infoln("new filter")
 	f := filter{db: param.Db, table: param.Table, binlogs: param.Binlogs, ty: param.Ty, isLastBinlog: false}
 	if param.StartDatetime == "" {
 		f.startDatetime = nil
@@ -79,13 +81,8 @@ func NewRecover(param def.InputInfo) *Recover {
 		return nil
 	}
 
-	file, err := os.OpenFile("raw.sql", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0655)
-	if err != nil {
-		common.Errorln("打开文件失败:", err)
-		return nil
-	}
-
-	//TODO 获取表结构,创建test库, table_recover表,清空表@hao.hu
+	//4. 构造数据库连接
+	common.Infoln("new mysql conn")
 	conn := db{
 		addr:  param.Addr,
 		port:  param.Port,
@@ -99,7 +96,15 @@ func NewRecover(param def.InputInfo) *Recover {
 		return nil
 	}
 
-	// 3.返回recover
+	//4. 构造原始sql文件句柄
+	common.Infoln("new raw sql export fd")
+	file, err := os.OpenFile("raw.sql", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0655)
+	if err != nil {
+		common.Errorln("打开文件失败:", err)
+		return nil
+	}
+
+	// 5.返回recover
 	return &Recover{
 		filter: f,
 		conn:   conn,
@@ -118,8 +123,10 @@ func (r *Recover) Run() error {
 		}
 	}()
 
+	// sql写test库
 	go r.write()
 
+	// 获取event,拼接为sql
 	var err error
 	for {
 		var event *replication.BinlogEvent
@@ -130,10 +137,7 @@ func (r *Recover) Run() error {
 
 		var finish bool
 		finish, err = r.recoverData(event)
-		if err != nil {
-			break
-		}
-		if finish {
+		if err != nil || finish {
 			break
 		}
 	}
@@ -236,9 +240,9 @@ func (r *Recover) parseEvent(event *replication.BinlogEvent) error {
 		r.exportRawSql(ev.Query)
 	case *replication.RowsEvent:
 		switch event.Header.EventType {
-		case replication.WRITE_ROWS_EVENTv0, replication.WRITE_ROWS_EVENTv1, replication.WRITE_ROWS_EVENTv2:
-			common.Infoln("can not parse WRITE_ROWS_EVENT")
-			return nil
+		//case replication.WRITE_ROWS_EVENTv0, replication.WRITE_ROWS_EVENTv1, replication.WRITE_ROWS_EVENTv2:
+		//	common.Infoln("can not parse WRITE_ROWS_EVENT")
+		//	return nil
 		case replication.UPDATE_ROWS_EVENTv0, replication.UPDATE_ROWS_EVENTv1, replication.UPDATE_ROWS_EVENTv2:
 			rows, err := r.filterUniqueRow(ev.Rows)
 			if err != nil {
@@ -305,6 +309,8 @@ func NewFileParser(binlogs []def.BinlogPos) *fileParser {
 		common.Errorln("binlogs empty")
 		return nil
 	}
+	common.Infoln("new file parser:", binlogs)
+
 	ret := &fileParser{
 		binlogs: binlogs,
 		curPos:  0,
@@ -321,11 +327,12 @@ func NewFileParser(binlogs []def.BinlogPos) *fileParser {
 func (f *fileParser) Init(file string, offset int64) error {
 	f.err = nil
 	go func() {
+		common.Infoln("RunParser start:", file, offset)
 		err := parser2.RunParser(file, offset, f.parser)
 		if err != nil {
 			f.err = common.Error("RunParser err:", err)
 		} else {
-			common.Infoln("RunParser done")
+			common.Infoln("RunParser done:", file, offset)
 		}
 	}()
 	time.Sleep(time.Second)
@@ -364,6 +371,8 @@ type dumpParser struct {
 }
 
 func NewDumpParser(cfg replication.BinlogSyncerConfig, pos mysql.Position) *dumpParser {
+	common.Infoln("new dump parser:", cfg, pos)
+
 	syncer := replication.NewBinlogSyncer(cfg)
 	if syncer == nil {
 		common.Errorln("NewBinlogSyncer get syncer == nil")

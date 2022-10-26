@@ -69,6 +69,9 @@ func parseParam() (def.InputInfo, error) {
 		if _, err := time.Parse("2006-01-02_15:04:05", *stop_datetime); err != nil {
 			return def.InputInfo{}, fmt.Errorf("时间格式不正确,eg:2006-01-02_15:04:05")
 		}
+	} else {
+		*stop_datetime = time.Now().Format("2006-01-02_15:04:05")
+		common.Infoln("auto add stop datetime:", *stop_datetime)
 	}
 	if !*export && *start_position == "" {
 		return def.InputInfo{}, fmt.Errorf("指定start_position,才能进行数据恢复")
@@ -244,7 +247,7 @@ func parseParam() (def.InputInfo, error) {
 		Export:        *export,
 		Ty:            ty,
 	}
-	fmt.Printf("%#v", ret)
+	common.Infoln(fmt.Sprintf("parse param: %#v", ret))
 	return ret, nil
 }
 
