@@ -85,7 +85,9 @@ func export(param def.InputInfo) error {
 			fmt.Sprintf("执行[%s]的查询[%s]出现错误[%v]", table.Name, pSql, err.Error())
 			return err
 		}
-
+		if len(ret.Values) == 0 {
+			break
+		}
 		var oneSelect []string
 		for row, cv := range ret.Values {
 			var lineValue string
