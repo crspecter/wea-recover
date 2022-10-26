@@ -87,20 +87,35 @@ func export(param def.InputInfo) error {
 		}
 
 		var oneSelect []string
-		for _, cv := range ret.Values {
+		for row, cv := range ret.Values {
 			var lineValue string
 			var lineTmp []string
-			for i, v := range cv {
-
-				value := mysql.ConvertToSqlValueString(v.AsString(), table.Columns[i].RawType)
-				lineTmp = append(lineTmp, value)
+			for i, _ := range cv {
+				val, e := ret.GetValue(row, i)
+				if e != nil {
+					return e
+				}
+				dataI, isNumber := mysql.ParseNumber(val)
+				if isNumber {
+					lineTmp = append(lineTmp, fmt.Sprintf("%v", dataI))
+				} else {
+					lineTmp = append(lineTmp, fmt.Sprintf("'%v'", dataI))
+				}
+				//value := mysql.ConvertToSqlValueString(v.AsString(), table.Columns[i].RawType)
 				if table.Columns[i].Name == table.GetPKColumn(0).Name {
-					id, err := strconv.ParseUint(value, 10, 64)
+					if isNumber {
+						switch pkv := dataI.(type) {
+						case int, int8, int16, int32, int64,
+							uint, uint8, uint16, uint32, uint64, float32, float64:
+							nowID = pkv.(int64)
+						}
+					} else {
+						return fmt.Errorf("主键不是数值类型")
+					}
 					if err != nil {
 						ret.Close()
 						return err
 					}
-					nowID = int64(id)
 				}
 			}
 			lineValue = fmt.Sprintf("(%v)", strings.Join(lineTmp, ","))
@@ -110,6 +125,7 @@ func export(param def.InputInfo) error {
 		sql := toSQL("test."+table.Name+"_recover", fields_sql, oneSelect)
 		file.WriteString(sql)
 		file.Sync()
+		ret.Close()
 	}
 
 	return nil

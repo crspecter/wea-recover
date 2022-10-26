@@ -45,7 +45,7 @@ func init() {
 
 func ConvertToSqlValueString(fieldValue []byte, fieldType string) string {
 	data := ConvertValue(fieldValue, fieldType)
-	dataI, isNumber := parseNumber(data)
+	dataI, isNumber := ParseNumber(data)
 	if isNumber {
 		return fmt.Sprintf("%v", dataI)
 	}
@@ -150,7 +150,7 @@ func ConvertValue(fieldValue []byte, fieldType string) interface{} {
 	}
 }
 
-func parseNumber(d interface{}) (interface{}, bool) {
+func ParseNumber(d interface{}) (interface{}, bool) {
 	switch v := d.(type) {
 	case string:
 		return Escape(v), false
