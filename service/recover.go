@@ -1,28 +1,13 @@
 package service
 
 import (
-	"bytes"
-	"context"
 	"fmt"
-	"github.com/go-mysql-org/go-mysql/client"
-	"github.com/go-mysql-org/go-mysql/mysql"
 	"github.com/go-mysql-org/go-mysql/replication"
-	"github.com/go-mysql-org/go-mysql/schema"
-	"github.com/pingcap/tidb/parser/format"
-	"math/rand"
 	"os"
-	"strconv"
-	"strings"
 	"sync"
-	"time"
 	"wea-recover/common"
 	"wea-recover/common/def"
 	mysql2 "wea-recover/mysql"
-	parser2 "wea-recover/parser"
-
-	pingcapparser "github.com/pingcap/tidb/parser"
-	"github.com/pingcap/tidb/parser/ast"
-	_ "github.com/pingcap/tidb/parser/test_driver"
 )
 
 type Recover struct {
@@ -47,69 +32,33 @@ func NewRecover(param def.InputInfo) *Recover {
 
 	// 2.构造过滤器
 	common.Infoln("new filter")
-	f := filter{db: param.Db, table: param.Table, binlogs: param.Binlogs, ty: param.Ty, isLastBinlog: false}
-	if param.StartDatetime == "" {
-		f.startDatetime = nil
-	} else {
-		t, _ := time.Parse("2006-01-02_15:04:05", param.StartDatetime)
-		f.startDatetime = &t
-	}
-	if param.StopDatetime == "" {
-		f.stopDatetime = nil
-	} else {
-		t, _ := time.Parse("2006-01-02_15:04:05", param.StopDatetime)
-		f.stopDatetime = &t
-	}
+	f := filter{}
+	_ = f.Init(param)
 
 	// 3.构造parser
-	var binlog parser
-	if param.Ty == def.DUMP_RECOVER {
-		cfg := replication.BinlogSyncerConfig{
-			ServerID:        rand.New(rand.NewSource(time.Now().UnixNano())).Uint32(),
-			Host:            param.Addr,
-			Port:            uint16(param.Port),
-			User:            param.User,
-			Password:        param.Pwd,
-			RecvBufferSize:  1024 * 1024,
-			HeartbeatPeriod: time.Second * 30,
-		}
-		pos := mysql.Position{
-			Name: param.Binlogs[0].Binlog,
-			Pos:  param.Binlogs[0].Pos,
-		}
-		binlog = NewDumpParser(cfg, pos)
-	} else if param.Ty == def.FILE_RECOVER {
-		binlog = NewFileParser(param.Binlogs)
-	}
-	if binlog == nil {
+	binlog, err := newBinlogParser(param)
+	if err != nil {
 		common.Errorln("构造binlog parser失败:", err)
 		return nil
 	}
 
 	//4. 构造数据库连接
 	common.Infoln("new mysql conn")
-	conn := db{
-		addr:  param.Addr,
-		port:  param.Port,
-		user:  param.User,
-		pwd:   param.Pwd,
-		db:    param.Db,
-		table: param.Table,
-	}
-	err = conn.Init()
+	conn := db{}
+	err = conn.Init(param)
 	if err != nil {
 		return nil
 	}
 
-	//4. 构造原始sql文件句柄
+	//5. 构造原始sql文件句柄
 	common.Infoln("new raw sql export fd")
 	file, err := os.OpenFile("raw.sql", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0655)
 	if err != nil {
-		common.Errorln("打开文件失败:", err)
+		common.Errorln("打开文件[raw.sql]失败:", err)
 		return nil
 	}
 
-	// 5.返回recover
+	// 6.返回recover
 	return &Recover{
 		filter: f,
 		conn:   conn,
@@ -293,430 +242,6 @@ func (r *Recover) parseEvent(event *replication.BinlogEvent) error {
 
 func (r *Recover) exportRawSql(sql []byte) {
 	_, _ = r.fd.Write(append(sql, '\n'))
-}
-
-type parser interface {
-	GetEvent() (*replication.BinlogEvent, error)
-}
-
-type fileParser struct {
-	binlogs []def.BinlogPos
-	curPos  int
-	parser  *replication.BinlogParser
-	err     error
-}
-
-func NewFileParser(binlogs []def.BinlogPos) *fileParser {
-	if len(binlogs) < 1 {
-		common.Errorln("binlogs empty")
-		return nil
-	}
-	common.Infoln("new file parser:", binlogs)
-
-	ret := &fileParser{
-		binlogs: binlogs,
-		curPos:  0,
-		parser:  replication.NewBinlogParser(),
-	}
-
-	err := ret.Init(ret.binlogs[0].Binlog, int64(ret.binlogs[0].Pos))
-	if err != nil {
-		return nil
-	}
-	return ret
-}
-
-func (f *fileParser) Init(file string, offset int64) error {
-	f.err = nil
-	go func() {
-		common.Infoln("RunParser start:", file, offset)
-		err := parser2.RunParser(file, offset, f.parser)
-		if err != nil {
-			f.err = common.Error("RunParser err:", err)
-		} else {
-			common.Infoln("RunParser done:", file, offset)
-		}
-	}()
-	time.Sleep(time.Second)
-	return f.err
-}
-
-func (f *fileParser) GetEvent() (*replication.BinlogEvent, error) {
-	event := parser2.GetFileEvent()
-	if event.Header.Flags == 0xffff {
-		f.curPos++
-		if len(f.binlogs)-1 < f.curPos {
-			common.Infoln("input file end")
-			return nil, nil
-		}
-		common.Infoln("exchange file:", f.binlogs[f.curPos])
-		err := f.Init(f.binlogs[f.curPos].Binlog, 0)
-		if err != nil {
-			common.Errorln("RunParser err:", err)
-			return nil, common.Error("RunParser err:", err)
-		}
-	} else if len(f.binlogs)-1 == f.curPos && f.binlogs[f.curPos].Pos != 0 {
-		//最后一个binlog,并且设置了截止位点
-		if event.Header.LogPos > f.binlogs[f.curPos].Pos {
-			common.Infoln("input file end")
-			return nil, nil
-		}
-	} else {
-		return event, nil
-	}
-	return parser2.GetFileEvent(), nil
-}
-
-type dumpParser struct {
-	streamer *replication.BinlogStreamer
-	err      error
-}
-
-func NewDumpParser(cfg replication.BinlogSyncerConfig, pos mysql.Position) *dumpParser {
-	common.Infoln("new dump parser:", cfg, pos)
-
-	syncer := replication.NewBinlogSyncer(cfg)
-	if syncer == nil {
-		common.Errorln("NewBinlogSyncer get syncer == nil")
-		return nil
-	}
-
-	streamer, err := syncer.StartSync(pos)
-	if err != nil {
-		common.Errorln("start sync err:", err)
-		return nil
-	}
-	return &dumpParser{streamer: streamer}
-}
-
-func (f *dumpParser) GetEvent() (*replication.BinlogEvent, error) {
-	event, err := f.streamer.GetEvent(context.Background())
-	if err != nil {
-		common.Errorln("GetEvent err:", err)
-		return nil, err
-	}
-	return event, nil
-}
-
-type db struct {
-	addr       string
-	port       int
-	user       string
-	pwd        string
-	db         string
-	table      string
-	schema     *schema.Table
-	clientPool *client.Pool
-	TestDBPool *client.Pool
-}
-
-func (d *db) Init() error {
-	//构建链接需要恢复数据库连接池
-	mysql2.NewConnPool(mysql2.DBConfig{
-		Addr:     d.addr + ":" + strconv.Itoa(d.port),
-		User:     d.user,
-		Password: d.pwd,
-		DBName:   d.db,
-	})
-
-	d.clientPool = mysql2.Pool
-
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-	defer cancel()
-	conn, err := d.clientPool.GetConn(ctx)
-	if err != nil {
-		return common.Error("GetConn err:", err)
-	}
-	defer d.clientPool.PutConn(conn)
-	_, err = conn.Execute("CREATE DATABASE IF NOT EXISTS test;")
-	if err != nil {
-		return common.Error("CREATE DATABASE test err:", err)
-	}
-
-	// 创建执行sql的连接池test库连接池
-	mysql2.NewConnTestPool(mysql2.DBConfig{
-		Addr:     d.addr + ":" + strconv.Itoa(d.port),
-		User:     d.user,
-		Password: d.pwd,
-	})
-	d.TestDBPool = mysql2.TestDBPool
-
-	err = d.updateSchema()
-	if err != nil {
-		return err
-	}
-
-	sql, err := d.getShowCreateTableSql(d.table)
-	if err != nil {
-		return common.Error("getShowCreateTableSql err:", err)
-	}
-
-	//创建test表
-	sql = strings.Replace(sql, fmt.Sprintf("CREATE TABLE IF NOT EXISTS `%s`", d.table), fmt.Sprintf("CREATE TABLE IF NOT EXISTS `test`.`%s`", d.table+"_recover"), 1)
-	var rsl *mysql.Result
-	rsl, err = conn.Execute(sql)
-	if err != nil {
-		return common.Error("执行建表语句执行失败 err:", err)
-	}
-	rsl.Close()
-
-	sql = fmt.Sprintf("TRUNCATE TABLE `test`.`%s`", d.table+"_recover")
-	_, err = conn.Execute(sql)
-	if err != nil {
-		return common.Error("清空表语句执行失败 err:", err)
-	}
-
-	return nil
-}
-
-func (d *db) UseDBName(dbName string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-	defer cancel()
-	conn, err := d.clientPool.GetConn(ctx)
-	if err != nil {
-		return common.Error("GetConn err:", err)
-	}
-	defer d.clientPool.PutConn(conn)
-	_, err = conn.Execute(fmt.Sprintf(`use %s`, dbName))
-	if err != nil {
-		return err
-	}
-	d.db = dbName
-	return nil
-}
-
-func (d *db) updateSchema() error {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-	defer cancel()
-	conn, err := d.clientPool.GetConn(ctx)
-	if err != nil {
-		return common.Error("GetConn err:", err)
-	}
-	defer d.clientPool.PutConn(conn)
-	t, err := schema.NewTable(conn, d.db, d.table)
-	if err != nil {
-		return common.Error("NewTable err:", err)
-	}
-	sql := fmt.Sprintf("show full columns from `%s`.`%s`", d.db, d.table)
-	r, err := conn.Execute(sql)
-	if err != nil {
-		return common.Error("Execute", sql, "err:", err)
-	}
-	for i := 0; i < r.RowNumber(); i++ {
-		extra, _ := r.GetString(i, 6)
-		if extra == "STORED GENERATED" {
-			t.Columns[i].IsVirtual = true
-		}
-	}
-	d.schema = t
-	return nil
-}
-
-func (d *db) getShowCreateTableSql(tName string) (string, error) {
-	sql := ""
-	err := d.QueryForRow(fmt.Sprintf("show CREATE TABLE `%s`", tName), nil, &sql)
-	if err != nil {
-		return "", err
-	}
-	sql = strings.Replace(sql, fmt.Sprintf("CREATE TABLE `%s`", tName), fmt.Sprintf("CREATE TABLE IF NOT EXISTS `%s`", tName), 1)
-	return sql, err
-}
-
-func (d *db) QueryForRow(stmt string, rslData ...interface{}) (err error) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
-	defer cancel()
-	conn, err := d.clientPool.GetConn(ctx)
-	if err != nil {
-		return common.Error("GetConn err:", err)
-	}
-	defer d.clientPool.PutConn(conn)
-
-	err = conn.Ping()
-	if err != nil {
-		return common.Error("Ping err:", err)
-	}
-	r, err := conn.Execute(stmt)
-	if err != nil {
-		return common.Error("Execute", stmt, "err:", err)
-	}
-	for i := 0; i < r.RowNumber(); i++ {
-		for j := 0; j < r.ColumnNumber() && j < len(rslData); j++ {
-			if rslData[j] == nil {
-				continue
-			}
-			switch v := rslData[j].(type) {
-			case *uint64:
-				*v, err = r.GetUint(i, j)
-				if err != nil {
-					return err
-				}
-			case *int64:
-				*v, err = r.GetInt(i, j)
-				if err != nil {
-					return err
-				}
-			case *string:
-				*v, err = r.GetString(i, j)
-				if err != nil {
-					return err
-				}
-			default:
-				return common.Error("只支持，nil,*uint64,*int64,*string类型")
-			}
-		}
-	}
-	return
-}
-
-func (d *db) GetSchema() *schema.Table {
-	return d.schema
-}
-
-type filter struct {
-	ty            def.RecoverType
-	binlogs       []def.BinlogPos
-	startDatetime *time.Time
-	stopDatetime  *time.Time
-	db            string
-	table         string
-	isLastBinlog  bool
-}
-
-type SqlFeature struct {
-	b []byte
-}
-
-func (m *SqlFeature) Write(p []byte) (n int, err error) {
-	cp := bytes.TrimSpace(p)
-	// 没有数据
-	if len(cp) == 0 {
-		m.b = append(m.b, p...)
-		return len(p), nil
-	}
-	if cp[0] == '\'' || cp[0] == '"' || cp[0] >= '0' && cp[0] <= '9' {
-		m.b = append(m.b, '?')
-	} else {
-		m.b = append(m.b, p...)
-	}
-	return len(p), nil
-}
-
-func (m *SqlFeature) ToString() string {
-	return string(m.b)
-}
-
-func (f filter) Valid(event *replication.BinlogEvent) bool {
-	//只处理RowsQueryEvent,UPDATE_ROWS_EVENTv0与DELETE_ROWS_EVENTv0
-	switch ev := event.Event.(type) {
-	case *replication.RowsQueryEvent:
-		pr := pingcapparser.New()
-		nodes, _, err := pr.Parse(string(ev.Query), "", "")
-		if err != nil {
-			common.Errorln("parse RowsQueryEvent err:", err)
-			return false
-		}
-
-		for _, node := range nodes {
-			sql := &SqlFeature{}
-			switch v := node.(type) {
-			case *ast.UpdateStmt:
-				_ = v.TableRefs.Restore(&format.RestoreCtx{
-					Flags: format.DefaultRestoreFlags,
-					In:    sql,
-				})
-				arr := strings.Split(sql.ToString(), ".")
-				if len(arr) == 1 {
-					if arr[0] == fmt.Sprintf("`%s`", f.table) {
-						common.Infoln("原始sql:", string(ev.Query))
-						return true
-					}
-				} else if len(arr) == 2 {
-					if arr[1] == fmt.Sprintf("`%s`", f.table) {
-						common.Infoln("原始sql:", string(ev.Query))
-						return true
-					}
-				} else {
-					return false
-				}
-			case *ast.DeleteStmt:
-				_ = v.TableRefs.Restore(&format.RestoreCtx{
-					Flags: format.DefaultRestoreFlags,
-					In:    sql,
-				})
-				arr := strings.Split(sql.ToString(), ".")
-				if len(arr) == 1 {
-					if arr[0] == fmt.Sprintf("`%s`", f.table) {
-						common.Infoln("原始sql:", string(ev.Query))
-						return true
-					}
-				} else if len(arr) == 2 {
-					if arr[1] == fmt.Sprintf("`%s`", f.table) {
-						common.Infoln("原始sql:", string(ev.Query))
-						return true
-					}
-				} else {
-					return false
-				}
-			}
-		}
-
-		return false
-	case *replication.RowsEvent:
-		dbName, oTableName := string(ev.Table.Schema), string(ev.Table.Table)
-		if dbName != f.db || oTableName != f.table {
-			return false
-		}
-		switch event.Header.EventType {
-		case replication.WRITE_ROWS_EVENTv0, replication.WRITE_ROWS_EVENTv1, replication.WRITE_ROWS_EVENTv2:
-			return false
-		case replication.UPDATE_ROWS_EVENTv0, replication.UPDATE_ROWS_EVENTv1, replication.UPDATE_ROWS_EVENTv2:
-			return true
-		case replication.DELETE_ROWS_EVENTv0, replication.DELETE_ROWS_EVENTv1, replication.DELETE_ROWS_EVENTv2:
-			return true
-		default:
-			return false
-		}
-	case *replication.RotateEvent:
-		common.Infoln("rotate binlog:", string(ev.NextLogName), ev.Position)
-		return false
-	default:
-		return false
-	}
-}
-
-func (f *filter) IsFinish(ev *replication.BinlogEvent) bool {
-	//if f.stopPosition != 0 && ev.Header.LogPos > f.stopPosition {
-	//	common.Infoln("recover end by stop pos:", f.stopPosition)
-	//	return true
-	//}
-
-	//是否为最后一个binlog
-	if f.ty == def.DUMP_RECOVER && len(f.binlogs) == 2 && f.isLastBinlog == false {
-		switch e := ev.Event.(type) {
-		case *replication.RotateEvent:
-			if string(e.NextLogName) == f.binlogs[1].Binlog {
-				f.isLastBinlog = true
-				return false
-			}
-		}
-	}
-
-	//最后一个binlog, 对比截止位点
-	if f.isLastBinlog {
-		_, ok := ev.Event.(*replication.RotateEvent)
-		if f.binlogs[1].Pos == 0 && ok {
-			return true
-		}
-		if f.binlogs[1].Pos != 0 && ev.Header.LogPos > f.binlogs[1].Pos {
-			return true
-		}
-	}
-
-	if f.stopDatetime != nil && int64(ev.Header.Timestamp) > f.stopDatetime.Unix() {
-		common.Infoln("recover end by stop datetime:", f.stopDatetime)
-		return true
-	}
-	return false
 }
 
 func check(param def.InputInfo) error {

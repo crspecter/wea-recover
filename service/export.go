@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/go-mysql-org/go-mysql/client"
 	"github.com/go-mysql-org/go-mysql/schema"
+	"wea-recover/common"
 
 	"strconv"
 	"strings"
@@ -37,11 +38,11 @@ func export(param def.InputInfo) error {
 	//链接测试库
 	conn_src, err := client.Connect(param.Addr+":"+strconv.Itoa(param.Port), param.User, param.Pwd, "test")
 	if err != nil {
-		println(fmt.Sprintf("connent export source db failed %v", err.Error()))
+		common.Errorln(fmt.Sprintf("connent export source db failed %v", err.Error()))
 	}
 	table, et := schema.NewTable(conn_src, "test", param.Table+"_recover")
 	if et != nil {
-		println(fmt.Sprintf("get schema for %s export source db failed %v", param.Table+"_recover", err.Error()))
+		common.Errorln(fmt.Sprintf("get schema for %s export source db failed %v", param.Table+"_recover", err.Error()))
 		return et
 	}
 

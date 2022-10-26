@@ -66,12 +66,20 @@ func parseParam() (def.InputInfo, error) {
 		}
 	}
 	if *stop_datetime != "" {
-		if _, err := time.Parse("2006-01-02_15:04:05", *stop_datetime); err != nil {
+		t, err := time.Parse("2006-01-02_15:04:05", *stop_datetime)
+		if err != nil {
 			return def.InputInfo{}, fmt.Errorf("时间格式不正确,eg:2006-01-02_15:04:05")
+		}
+		cur := time.Now()
+		if cur.Sub(t) < 0 {
+			*stop_datetime = cur.Format("2006-01-02_15:04:05")
+			common.Infoln("stop datetime err use current time:", *stop_datetime)
+			fmt.Println("stop datetime err use current time:", *stop_datetime)
 		}
 	} else {
 		*stop_datetime = time.Now().Format("2006-01-02_15:04:05")
 		common.Infoln("auto add stop datetime:", *stop_datetime)
+		fmt.Println("auto add stop datetime:", *stop_datetime)
 	}
 	if !*export && *start_position == "" {
 		return def.InputInfo{}, fmt.Errorf("指定start_position,才能进行数据恢复")
