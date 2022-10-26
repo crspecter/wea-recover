@@ -8,6 +8,7 @@ import (
 	"github.com/go-mysql-org/go-mysql/mysql"
 	"github.com/go-mysql-org/go-mysql/replication"
 	"github.com/go-mysql-org/go-mysql/schema"
+	"github.com/pingcap/tidb/parser/format"
 	"math/rand"
 	"os"
 	"strconv"
@@ -102,7 +103,7 @@ func NewRecover(param def.InputInfo) *Recover {
 
 	//4. 构造原始sql文件句柄
 	common.Infoln("new raw sql export fd")
-	file, err := os.OpenFile("raw.sql", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0655)
+	file, err := os.OpenFile("raw.sql", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0655)
 	if err != nil {
 		common.Errorln("打开文件失败:", err)
 		return nil
@@ -204,9 +205,6 @@ func (r *Recover) recoverData(ev *replication.BinlogEvent) (bool, error) {
 }
 
 func (r *Recover) filterUniqueRow(Rows [][]interface{}) ([][]interface{}, error) {
-	if len(Rows)%2 != 0 {
-		return nil, common.Error("binlog rows parse err")
-	}
 	if len(Rows) == 0 {
 		return nil, common.Error("binlog rows parse err")
 	}
@@ -584,28 +582,84 @@ type filter struct {
 	isLastBinlog  bool
 }
 
+type SqlFeature struct {
+	b []byte
+}
+
+func (m *SqlFeature) Write(p []byte) (n int, err error) {
+	cp := bytes.TrimSpace(p)
+	// 没有数据
+	if len(cp) == 0 {
+		m.b = append(m.b, p...)
+		return len(p), nil
+	}
+	if cp[0] == '\'' || cp[0] == '"' || cp[0] >= '0' && cp[0] <= '9' {
+		m.b = append(m.b, '?')
+	} else {
+		m.b = append(m.b, p...)
+	}
+	return len(p), nil
+}
+
+func (m *SqlFeature) ToString() string {
+	return string(m.b)
+}
+
 func (f filter) Valid(event *replication.BinlogEvent) bool {
 	//只处理RowsQueryEvent,UPDATE_ROWS_EVENTv0与DELETE_ROWS_EVENTv0
 	switch ev := event.Event.(type) {
 	case *replication.RowsQueryEvent:
-		common.Infoln("原始sql:", string(ev.Query))
 		pr := pingcapparser.New()
 		nodes, _, err := pr.Parse(string(ev.Query), "", "")
 		if err != nil {
 			common.Errorln("parse RowsQueryEvent err:", err)
 			return false
 		}
+
 		for _, node := range nodes {
+			sql := &SqlFeature{}
 			switch v := node.(type) {
 			case *ast.UpdateStmt:
-				fmt.Println(v)
+				_ = v.TableRefs.Restore(&format.RestoreCtx{
+					Flags: format.DefaultRestoreFlags,
+					In:    sql,
+				})
+				arr := strings.Split(sql.ToString(), ".")
+				if len(arr) == 1 {
+					if arr[0] == fmt.Sprintf("`%s`", f.table) {
+						common.Infoln("原始sql:", string(ev.Query))
+						return true
+					}
+				} else if len(arr) == 2 {
+					if arr[1] == fmt.Sprintf("`%s`", f.table) {
+						common.Infoln("原始sql:", string(ev.Query))
+						return true
+					}
+				} else {
+					return false
+				}
 			case *ast.DeleteStmt:
-				fmt.Println(v)
+				_ = v.TableRefs.Restore(&format.RestoreCtx{
+					Flags: format.DefaultRestoreFlags,
+					In:    sql,
+				})
+				arr := strings.Split(sql.ToString(), ".")
+				if len(arr) == 1 {
+					if arr[0] == fmt.Sprintf("`%s`", f.table) {
+						common.Infoln("原始sql:", string(ev.Query))
+						return true
+					}
+				} else if len(arr) == 2 {
+					if arr[1] == fmt.Sprintf("`%s`", f.table) {
+						common.Infoln("原始sql:", string(ev.Query))
+						return true
+					}
+				} else {
+					return false
+				}
 			}
 		}
-		if bytes.Contains(ev.Query, []byte(f.table)) && !bytes.Contains(ev.Query, []byte("select")) {
-			return true
-		}
+
 		return false
 	case *replication.RowsEvent:
 		dbName, oTableName := string(ev.Table.Schema), string(ev.Table.Table)
