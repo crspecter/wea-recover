@@ -116,7 +116,7 @@ func export(param def.InputInfo) error {
 }
 
 func getMaxID(tName string, pk string) (int64, error) {
-	sqlStr := fmt.Sprintf("select %s from %s %s order by `%s` desc limit 1", pk, tName, "test."+tName, pk)
+	sqlStr := fmt.Sprintf("select %s from %s  order by `%s` desc limit 1", pk, "test."+tName, pk)
 	rsl := int64(0)
 	err := mysql.QueryForRow(sqlStr, &rsl)
 	if err != nil {
@@ -129,7 +129,7 @@ func getMaxID(tName string, pk string) (int64, error) {
 }
 
 func getMinID(tName string, pk string) (int64, error) {
-	sqlStr := fmt.Sprintf("select %s from %s %s order by `%s`  limit 1", pk, tName, pk)
+	sqlStr := fmt.Sprintf("select %s from %s order by `%s`  limit 1", pk, "test."+tName, pk)
 
 	rsl := int64(0)
 	err := mysql.QueryForRow(sqlStr, &rsl)
