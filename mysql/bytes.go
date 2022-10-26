@@ -20,6 +20,29 @@ var (
 	EncodeMap [256]byte
 )
 
+var encodeRef = map[byte]byte{
+	'\x00': '0',
+	'\'':   '\'',
+	'"':    '"',
+	'\b':   'b',
+	'\n':   'n',
+	'\r':   'r',
+	'\t':   't',
+	26:     'Z', // ctl-Z
+	'\\':   '\\',
+}
+
+func init() {
+	for i := range EncodeMap {
+		EncodeMap[i] = DONTESCAPE
+	}
+	for i := range EncodeMap {
+		if to, ok := encodeRef[byte(i)]; ok {
+			EncodeMap[byte(i)] = to
+		}
+	}
+}
+
 func ConvertToSqlValueString(fieldValue []byte, fieldType string) string {
 	data := ConvertValue(fieldValue, fieldType)
 	dataI, isNumber := parseNumber(data)

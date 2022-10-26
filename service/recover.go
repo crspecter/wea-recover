@@ -410,14 +410,6 @@ func (d *db) Init() error {
 
 	d.clientPool = mysql2.Pool
 
-	// 创建执行sql的连接池test库连接池
-	mysql2.NewConnTestPool(mysql2.DBConfig{
-		Addr:     d.addr + ":" + strconv.Itoa(d.port),
-		User:     d.user,
-		Password: d.pwd,
-	})
-	d.TestDBPool = mysql2.TestDBPool
-
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 	conn, err := d.clientPool.GetConn(ctx)
@@ -429,6 +421,14 @@ func (d *db) Init() error {
 	if err != nil {
 		return common.Error("CREATE DATABASE test err:", err)
 	}
+
+	// 创建执行sql的连接池test库连接池
+	mysql2.NewConnTestPool(mysql2.DBConfig{
+		Addr:     d.addr + ":" + strconv.Itoa(d.port),
+		User:     d.user,
+		Password: d.pwd,
+	})
+	d.TestDBPool = mysql2.TestDBPool
 
 	err = d.updateSchema()
 	if err != nil {

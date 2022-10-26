@@ -83,7 +83,7 @@ func (s *SqlAttr) Merge(a *SqlAttr) bool {
 }
 
 func (s *SqlAttr) ToSql() string {
-	return fmt.Sprintf("replace into `%s` %s values %s", s.TName, s.Field, strings.Join(s.Value, ","))
+	return fmt.Sprintf("replace into `test`.`%s` %s values %s", s.TName, s.Field, strings.Join(s.Value, ","))
 }
 
 func HandleUpdateEvent(rows [][]interface{}, table *schema.Table, sqlType SqlType) (sql []*SqlAttr, match bool, err error) {

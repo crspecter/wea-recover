@@ -78,7 +78,7 @@ func export(param def.InputInfo) error {
 
 	nowID := minId - 1
 	//查询主循环
-	for nowID >= minId && nowID <= maxId {
+	for nowID <= maxId {
 
 		ret, eq := stmt.Execute(nowID, maxId)
 		if eq != nil {
