@@ -32,7 +32,8 @@ func export(param def.InputInfo) error {
 	if ef != nil {
 		return ef
 	}
-	file.Close()
+	defer file.Close()
+
 	//链接测试库
 	conn_src, err := client.Connect(param.Addr+":"+strconv.Itoa(param.Port), param.User, param.Pwd, "test")
 	if err != nil {

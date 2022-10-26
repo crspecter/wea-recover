@@ -18,6 +18,10 @@ import (
 	"wea-recover/common/def"
 	mysql2 "wea-recover/mysql"
 	parser2 "wea-recover/parser"
+
+	pingcapparser "github.com/pingcap/tidb/parser"
+	"github.com/pingcap/tidb/parser/ast"
+	_ "github.com/pingcap/tidb/parser/test_driver"
 )
 
 type Recover struct {
@@ -585,6 +589,20 @@ func (f filter) Valid(event *replication.BinlogEvent) bool {
 	switch ev := event.Event.(type) {
 	case *replication.RowsQueryEvent:
 		common.Infoln("原始sql:", string(ev.Query))
+		pr := pingcapparser.New()
+		nodes, _, err := pr.Parse(string(ev.Query), "", "")
+		if err != nil {
+			common.Errorln("parse RowsQueryEvent err:", err)
+			return false
+		}
+		for _, node := range nodes {
+			switch v := node.(type) {
+			case *ast.UpdateStmt:
+				fmt.Println(v)
+			case *ast.DeleteStmt:
+				fmt.Println(v)
+			}
+		}
 		if bytes.Contains(ev.Query, []byte(f.table)) && !bytes.Contains(ev.Query, []byte("select")) {
 			return true
 		}
