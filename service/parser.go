@@ -136,7 +136,9 @@ func NewDumpParser(cfg replication.BinlogSyncerConfig, pos mysql.Position) (*dum
 }
 
 func (f *dumpParser) GetEvent() (*replication.BinlogEvent, error) {
-	event, err := f.streamer.GetEvent(context.Background())
+	ctx, cancelFunc := context.WithTimeout(context.Background(), time.Second*20)
+	defer cancelFunc()
+	event, err := f.streamer.GetEvent(ctx)
 	if err != nil {
 		common.Errorln("GetEvent err:", err)
 		return nil, err

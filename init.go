@@ -263,6 +263,7 @@ func run(param def.InputInfo) {
 	var err error
 	//数据恢复
 	if param.Ty != def.EXPORT_ONLY {
+		fmt.Println("数据恢复")
 		r := service.NewRecover(param)
 		if r == nil {
 			err = fmt.Errorf("new recover fail")
@@ -273,6 +274,7 @@ func run(param def.InputInfo) {
 
 	//导出sql
 	if err == nil && param.Export {
+		fmt.Println("导出SQL")
 		err = service.Export(param)
 	}
 

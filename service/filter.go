@@ -49,6 +49,7 @@ func (f filter) Valid(event *replication.BinlogEvent) bool {
 	//只处理RowsQueryEvent,UPDATE_ROWS_EVENTv0与DELETE_ROWS_EVENTv0
 	switch ev := event.Event.(type) {
 	case *replication.RowsQueryEvent:
+		//TODO:待测试,复杂sql时是否能正常工作
 		pr := pingcapparser.New()
 		nodes, _, err := pr.Parse(string(ev.Query), "", "")
 		if err != nil {
@@ -117,6 +118,7 @@ func (f filter) Valid(event *replication.BinlogEvent) bool {
 			return false
 		}
 	case *replication.RotateEvent:
+		fmt.Println("rotate binlog:", string(ev.NextLogName), ev.Position)
 		common.Infoln("rotate binlog:", string(ev.NextLogName), ev.Position)
 		return false
 	default:

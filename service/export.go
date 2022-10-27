@@ -140,10 +140,8 @@ func getMaxID(tName string, pk string) (int64, error) {
 	rsl := int64(0)
 	err := mysql.QueryForRow(sqlStr, &rsl)
 	if err != nil {
-		fmt.Printf("[%s]执行sql[%s]异常", tName, sqlStr)
-		return 0, err
+		return 0, common.Error(tName, "执行sql", sqlStr, "异常", err)
 	}
-	fmt.Printf("执行sql %s 成功", sqlStr)
 	return rsl, err
 
 }
@@ -154,8 +152,7 @@ func getMinID(tName string, pk string) (int64, error) {
 	rsl := int64(0)
 	err := mysql.QueryForRow(sqlStr, &rsl)
 	if err != nil {
-		fmt.Printf("[%s]执行sql[%s]异常", tName, sqlStr)
-		return 0, err
+		return 0, common.Error(tName, "执行sql", sqlStr, "异常", err)
 	}
 	return rsl, err
 

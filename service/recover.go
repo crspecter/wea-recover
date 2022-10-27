@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/go-mysql-org/go-mysql/replication"
 	"os"
+	"strings"
 	"sync"
 	"wea-recover/common"
 	"wea-recover/common/def"
@@ -86,6 +87,11 @@ func (r *Recover) Run() error {
 		var event *replication.BinlogEvent
 		event, err = r.binlog.GetEvent()
 		if err != nil {
+			if strings.Contains(err.Error(), "context deadline exceeded") {
+				common.Infoln("dump模式,获取事件超时,主动结束")
+				fmt.Println("dump模式,获取事件超时,主动结束")
+				err = nil
+			}
 			break
 		}
 
@@ -103,6 +109,7 @@ func (r *Recover) Run() error {
 
 func (r *Recover) write() {
 	r.wg.Add(1)
+	count := 0
 	for {
 		select {
 		case sql, ok := <-r.ch:
@@ -110,8 +117,7 @@ func (r *Recover) write() {
 				goto END
 			}
 			//修改写入test库的表名称为xxx_recover
-			tName := sql.TName + "_recover"
-			sql.TName = tName
+			sql.TName += "_recover"
 			sqlCmd := sql.ToSql()
 			//写入
 			err := mysql2.ExecuteTestDB(sqlCmd)
@@ -119,6 +125,10 @@ func (r *Recover) write() {
 				common.Errorln("写入恢复库执行sql失败:", err)
 				fmt.Println("写入恢复库执行sql失败:", err)
 				os.Exit(-1)
+			}
+
+			if count++; count%1000 == 0 {
+				fmt.Println("已恢复", count, "条数据...")
 			}
 			common.Infoln("exec sql:", sqlCmd)
 		}
@@ -153,9 +163,12 @@ func (r *Recover) recoverData(ev *replication.BinlogEvent) (bool, error) {
 	return false, nil
 }
 
-func (r *Recover) filterUniqueRow(Rows [][]interface{}) ([][]interface{}, error) {
+func (r *Recover) filterUniqueRow(Rows [][]interface{}, ty eventType) ([][]interface{}, error) {
 	if len(Rows) == 0 {
 		return nil, common.Error("binlog rows parse err")
+	}
+	if ty == UPDATE_ROWS && len(Rows)%2 != 0 {
+		return nil, common.Error("update binlog rows parse err")
 	}
 
 	_schema := r.conn.GetSchema()
@@ -170,20 +183,44 @@ func (r *Recover) filterUniqueRow(Rows [][]interface{}) ([][]interface{}, error)
 	}
 
 	var ret [][]interface{}
-	for _, row := range Rows {
-		key := ""
-		for _, pkIndex := range _schema.PKColumns {
-			str := fmt.Sprintf("%v.", row[pkIndex])
-			key += str
+	if ty == DELETE_ROWS {
+		for _, row := range Rows {
+			key := ""
+			for _, pkIndex := range _schema.PKColumns {
+				str := fmt.Sprintf("%v.", row[pkIndex])
+				key += str
+			}
+			_, ok := r.pkMap[key]
+			if !ok {
+				ret = append(ret, row)
+				r.pkMap[key] = struct{}{}
+			}
 		}
-		_, ok := r.pkMap[key]
-		if !ok {
-			ret = append(ret, row)
+	} else if ty == UPDATE_ROWS {
+		for i := 0; i < len(Rows); i += 2 {
+			row := Rows[i]
+			key := ""
+			for _, pkIndex := range _schema.PKColumns {
+				str := fmt.Sprintf("%v.", row[pkIndex])
+				key += str
+			}
+			_, ok := r.pkMap[key]
+			if !ok {
+				ret = append(ret, row, Rows[i+1])
+				r.pkMap[key] = struct{}{}
+			}
 		}
 	}
 
 	return ret, nil
 }
+
+type eventType int
+
+const (
+	UPDATE_ROWS eventType = iota
+	DELETE_ROWS
+)
 
 func (r *Recover) parseEvent(event *replication.BinlogEvent) error {
 	switch ev := event.Event.(type) {
@@ -191,11 +228,8 @@ func (r *Recover) parseEvent(event *replication.BinlogEvent) error {
 		r.exportRawSql(ev.Query)
 	case *replication.RowsEvent:
 		switch event.Header.EventType {
-		//case replication.WRITE_ROWS_EVENTv0, replication.WRITE_ROWS_EVENTv1, replication.WRITE_ROWS_EVENTv2:
-		//	common.Infoln("can not parse WRITE_ROWS_EVENT")
-		//	return nil
 		case replication.UPDATE_ROWS_EVENTv0, replication.UPDATE_ROWS_EVENTv1, replication.UPDATE_ROWS_EVENTv2:
-			rows, err := r.filterUniqueRow(ev.Rows)
+			rows, err := r.filterUniqueRow(ev.Rows, UPDATE_ROWS)
 			if err != nil {
 				return common.Error("filterUniqueRow err:", err)
 			} else if rows == nil || len(rows) == 0 {
@@ -214,7 +248,7 @@ func (r *Recover) parseEvent(event *replication.BinlogEvent) error {
 			}
 			return nil
 		case replication.DELETE_ROWS_EVENTv0, replication.DELETE_ROWS_EVENTv1, replication.DELETE_ROWS_EVENTv2:
-			rows, err := r.filterUniqueRow(ev.Rows)
+			rows, err := r.filterUniqueRow(ev.Rows, DELETE_ROWS)
 			if err != nil {
 				return common.Error("filterUniqueRow err:", err)
 			} else if rows == nil || len(rows) == 0 {
