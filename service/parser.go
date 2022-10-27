@@ -44,7 +44,6 @@ type fileParser struct {
 	binlogs []def.BinlogPos
 	curPos  int
 	parser  *replication.BinlogParser
-	err     error
 }
 
 func NewFileParser(binlogs []def.BinlogPos) (*fileParser, error) {
@@ -67,18 +66,27 @@ func NewFileParser(binlogs []def.BinlogPos) (*fileParser, error) {
 }
 
 func (f *fileParser) Init(file string, offset int64) error {
-	f.err = nil
+	done := false
+	var err error = nil
 	go func() {
 		common.Infoln("RunParser start:", file, offset)
-		err := parser2.RunParser(file, offset, f.parser)
+		err = parser2.RunParser(file, offset, f.parser)
+		done = true
 		if err != nil {
-			f.err = common.Error("RunParser err:", err)
+			err = common.Error("RunParser err:", err)
 		} else {
 			common.Infoln("RunParser done:", file, offset)
 		}
 	}()
-	time.Sleep(time.Second)
-	return f.err
+
+	for i := 0; i < 10; i++ {
+		time.Sleep(time.Millisecond * 100)
+		if done {
+			return err
+		}
+	}
+
+	return err
 }
 
 func (f *fileParser) GetEvent() (*replication.BinlogEvent, error) {

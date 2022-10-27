@@ -261,6 +261,7 @@ func parseParam() (def.InputInfo, error) {
 
 func run(param def.InputInfo) {
 	var err error
+	//数据恢复
 	if param.Ty != def.EXPORT_ONLY {
 		r := service.NewRecover(param)
 		if r == nil {
@@ -279,18 +280,4 @@ func run(param def.InputInfo) {
 		fmt.Println("恢复失败:", err)
 		log.Fatal("恢复失败:", err)
 	}
-}
-
-func isFile(path string) bool {
-	file, err := os.Stat(path)
-	if err != nil {
-		common.Errorln("find file error ", err)
-		return false
-	}
-	if file.IsDir() {
-		common.Errorln("find dir not file :", path)
-		return false
-	}
-
-	return true
 }

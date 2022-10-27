@@ -45,19 +45,6 @@ func (f *filter) Init(param def.InputInfo) error {
 	return nil
 }
 
-type SqlFeature struct {
-	b []byte
-}
-
-func (m *SqlFeature) Write(p []byte) (n int, err error) {
-	m.b = append(m.b, p...)
-	return len(p), nil
-}
-
-func (m *SqlFeature) ToString() string {
-	return string(m.b)
-}
-
 func (f filter) Valid(event *replication.BinlogEvent) bool {
 	//只处理RowsQueryEvent,UPDATE_ROWS_EVENTv0与DELETE_ROWS_EVENTv0
 	switch ev := event.Event.(type) {
@@ -138,11 +125,6 @@ func (f filter) Valid(event *replication.BinlogEvent) bool {
 }
 
 func (f *filter) IsFinish(ev *replication.BinlogEvent) bool {
-	//if f.stopPosition != 0 && ev.Header.LogPos > f.stopPosition {
-	//	common.Infoln("recover end by stop pos:", f.stopPosition)
-	//	return true
-	//}
-
 	//是否为最后一个binlog
 	if f.ty == def.DUMP_RECOVER && len(f.binlogs) == 2 && f.isLastBinlog == false {
 		switch e := ev.Event.(type) {
@@ -170,4 +152,17 @@ func (f *filter) IsFinish(ev *replication.BinlogEvent) bool {
 		return true
 	}
 	return false
+}
+
+type SqlFeature struct {
+	b []byte
+}
+
+func (m *SqlFeature) Write(p []byte) (n int, err error) {
+	m.b = append(m.b, p...)
+	return len(p), nil
+}
+
+func (m *SqlFeature) ToString() string {
+	return string(m.b)
 }

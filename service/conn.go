@@ -120,17 +120,6 @@ func (d *db) updateSchema() error {
 	if err != nil {
 		return common.Error("NewTable err:", err)
 	}
-	sql := fmt.Sprintf("show full columns from `%s`.`%s`", d.db, d.table)
-	r, err := conn.Execute(sql)
-	if err != nil {
-		return common.Error("Execute", sql, "err:", err)
-	}
-	for i := 0; i < r.RowNumber(); i++ {
-		extra, _ := r.GetString(i, 6)
-		if extra == "STORED GENERATED" {
-			t.Columns[i].IsVirtual = true
-		}
-	}
 	d.schema = t
 	return nil
 }
