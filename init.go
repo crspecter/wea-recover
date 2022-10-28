@@ -29,6 +29,7 @@ func parseParam() (def.InputInfo, error) {
 	start_position := pflag.StringP("start-position", "", "", "恢复起始位点信息,eg:mysql-bin.001:4")
 	stop_position := pflag.StringP("stop-position", "", "", "恢复截止位点信息,eg:mysql-bin.010")
 	export := pflag.Bool("export", false, "是否导出表到当前目录下export.sql文件中")
+	event_filter := pflag.StringP("event-filter", "", "both", "事件类型过滤,支持update,delete,both(默认)")
 	pflag.Parse()
 
 	*addr = strings.TrimSpace(*addr)
@@ -41,6 +42,7 @@ func parseParam() (def.InputInfo, error) {
 	*stop_datetime = strings.TrimSpace(*stop_datetime)
 	*start_position = strings.TrimSpace(*start_position)
 	*stop_position = strings.TrimSpace(*stop_position)
+	*event_filter = strings.TrimSpace(*event_filter)
 
 	path := *binlog_path
 	if path != "" && path[len(path)-1] != '/' && path[len(path)-1] != '\\' {
@@ -58,6 +60,9 @@ func parseParam() (def.InputInfo, error) {
 	}
 	if *table == "" {
 		return def.InputInfo{}, fmt.Errorf("数据库表不能为空")
+	}
+	if *event_filter != "both" && *event_filter != "update" && *event_filter != "delete" {
+		return def.InputInfo{}, fmt.Errorf("不支持的事件类型过滤")
 	}
 
 	if *start_datetime != "" {
@@ -253,6 +258,7 @@ func parseParam() (def.InputInfo, error) {
 		StopDatetime:  *stop_datetime,
 		Export:        *export,
 		Ty:            ty,
+		EventFilter:   *event_filter,
 	}
 	common.Infoln(fmt.Sprintf("parse param: %#v", ret))
 	return ret, nil
@@ -262,7 +268,7 @@ func run(param def.InputInfo) {
 	var err error
 	//数据恢复
 	if param.Ty != def.EXPORT_ONLY {
-		fmt.Println("数据恢复")
+		fmt.Println("开始数据恢复...")
 		r := service.NewRecover(param)
 		if r == nil {
 			err = fmt.Errorf("new recover fail")
@@ -273,7 +279,7 @@ func run(param def.InputInfo) {
 
 	//导出sql
 	if err == nil && param.Export {
-		fmt.Println("导出SQL")
+		fmt.Println("开始导出SQL...")
 		err = service.Export(param)
 	}
 

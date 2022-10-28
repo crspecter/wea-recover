@@ -12,6 +12,7 @@ type InputInfo struct {
 	StopDatetime  string
 	Export        bool
 	Ty            RecoverType
+	EventFilter   string
 }
 
 type RecoverType int

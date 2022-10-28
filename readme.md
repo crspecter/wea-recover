@@ -48,3 +48,4 @@
 - --start-datetime : 恢复起始时间,eg:2006-01-02_15:04:05
 - --stop-datetime : 恢复截止时间,eg:2006-01-02_15:04:05
 - --export : 是否导出数据到文件table_recover.sql
+- --event-filter: 事件类型过滤,支持:update,delete,both(默认)

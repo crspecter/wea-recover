@@ -21,6 +21,7 @@ type filter struct {
 	db            string
 	table         string
 	isLastBinlog  bool
+	eventFilter   string
 }
 
 func (f *filter) Init(param def.InputInfo) error {
@@ -29,6 +30,7 @@ func (f *filter) Init(param def.InputInfo) error {
 	f.binlogs = param.Binlogs
 	f.ty = param.Ty
 	f.isLastBinlog = false
+	f.eventFilter = param.EventFilter
 
 	if param.StartDatetime == "" {
 		f.startDatetime = nil
@@ -61,6 +63,10 @@ func (f filter) Valid(event *replication.BinlogEvent) bool {
 			sql := &SqlFeature{}
 			switch v := node.(type) {
 			case *ast.UpdateStmt:
+				if f.eventFilter != "both" && f.eventFilter != "update" {
+					return false
+				}
+
 				_ = v.TableRefs.Restore(&format.RestoreCtx{
 					Flags: format.DefaultRestoreFlags,
 					In:    sql,
@@ -80,6 +86,10 @@ func (f filter) Valid(event *replication.BinlogEvent) bool {
 					return false
 				}
 			case *ast.DeleteStmt:
+				if f.eventFilter != "both" && f.eventFilter != "delete" {
+					return false
+				}
+
 				_ = v.TableRefs.Restore(&format.RestoreCtx{
 					Flags: format.DefaultRestoreFlags,
 					In:    sql,
@@ -111,8 +121,14 @@ func (f filter) Valid(event *replication.BinlogEvent) bool {
 		case replication.WRITE_ROWS_EVENTv0, replication.WRITE_ROWS_EVENTv1, replication.WRITE_ROWS_EVENTv2:
 			return false
 		case replication.UPDATE_ROWS_EVENTv0, replication.UPDATE_ROWS_EVENTv1, replication.UPDATE_ROWS_EVENTv2:
+			if f.eventFilter != "both" && f.eventFilter != "update" {
+				return false
+			}
 			return true
 		case replication.DELETE_ROWS_EVENTv0, replication.DELETE_ROWS_EVENTv1, replication.DELETE_ROWS_EVENTv2:
+			if f.eventFilter != "both" && f.eventFilter != "delete" {
+				return false
+			}
 			return true
 		default:
 			return false
