@@ -135,6 +135,8 @@ func (r *Recover) write() {
 	}
 
 END:
+	fmt.Println("总共恢复", count, "条数据")
+	common.Infoln("总共恢复", count, "条数据")
 	r.wg.Done()
 }
 
