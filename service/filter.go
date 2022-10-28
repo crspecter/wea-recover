@@ -48,6 +48,10 @@ func (f *filter) Init(param def.InputInfo) error {
 }
 
 func (f filter) Valid(event *replication.BinlogEvent) bool {
+	if f.startDatetime != nil && int64(event.Header.Timestamp) < f.startDatetime.Unix() {
+		return false
+	}
+
 	//只处理RowsQueryEvent,UPDATE_ROWS_EVENTv0与DELETE_ROWS_EVENTv0
 	switch ev := event.Event.(type) {
 	case *replication.RowsQueryEvent:
