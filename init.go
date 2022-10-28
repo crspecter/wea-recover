@@ -23,7 +23,7 @@ func parseParam() (def.InputInfo, error) {
 	db := pflag.StringP("db", "D", "", "MySQL database")
 	table := pflag.StringP("table", "t", "", "MySQL table")
 	//binlog := pflag.StringP("binlog", "", "", "dump模式下起始binlog")
-	binlog_path := pflag.StringP("binlog-path", "", "", "文件模式下,binlog集合目录,eg: /path")
+	binlog_path := pflag.StringP("binlog-path", "", "", "文件模式下,binlog集合目录,eg:/path")
 	start_datetime := pflag.StringP("start-datetime", "", "", "恢复起始时间,eg:2006-01-02_15:04:05")
 	stop_datetime := pflag.StringP("stop-datetime", "", "", "恢复截止时间,eg:2006-01-02_15:04:05")
 	start_position := pflag.StringP("start-position", "", "", "恢复起始位点信息,eg:mysql-bin.001:4")
@@ -225,7 +225,6 @@ func parseParam() (def.InputInfo, error) {
 			if len(binlogs) == 0 {
 				return def.InputInfo{}, fmt.Errorf("解析入参binlog失败")
 			}
-			//TODO:如果没有截止时间,没有截止位点,怎么退出?
 			ty = def.DUMP_RECOVER
 		}
 	}
