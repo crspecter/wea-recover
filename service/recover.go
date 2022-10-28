@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"time"
 	"wea-recover/common"
 	"wea-recover/common/def"
 	mysql2 "wea-recover/mysql"
@@ -110,6 +111,18 @@ func (r *Recover) Run() error {
 func (r *Recover) write() {
 	r.wg.Add(1)
 	count := 0
+
+	go func() {
+		ticker := time.NewTicker(time.Second * 30)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				fmt.Println("已恢复", count, "条数据...")
+			}
+		}
+	}()
+
 	for {
 		select {
 		case sql, ok := <-r.ch:
@@ -127,9 +140,6 @@ func (r *Recover) write() {
 				os.Exit(-1)
 			}
 			count += len(sql.Value)
-			if count%1000 == 0 {
-				fmt.Println("已恢复", count, "条数据...")
-			}
 			common.Infoln("exec sql:", sqlCmd)
 		}
 	}
