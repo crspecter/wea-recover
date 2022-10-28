@@ -126,8 +126,8 @@ func (r *Recover) write() {
 				fmt.Println("写入恢复库执行sql失败:", err)
 				os.Exit(-1)
 			}
-
-			if count++; count%1000 == 0 {
+			count += len(sql.Value)
+			if count%1000 == 0 {
 				fmt.Println("已恢复", count, "条数据...")
 			}
 			common.Infoln("exec sql:", sqlCmd)
