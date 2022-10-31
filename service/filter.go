@@ -160,8 +160,8 @@ func (f *filter) IsFinish(ev *replication.BinlogEvent) bool {
 
 	//最后一个binlog, 对比截止位点
 	if f.isLastBinlog {
-		_, ok := ev.Event.(*replication.RotateEvent)
-		if f.binlogs[1].Pos == 0 && ok {
+		e, ok := ev.Event.(*replication.RotateEvent)
+		if f.binlogs[1].Pos == 0 && ok && string(e.NextLogName) != f.binlogs[1].Binlog {
 			return true
 		}
 		if f.binlogs[1].Pos != 0 && ev.Header.LogPos > f.binlogs[1].Pos {

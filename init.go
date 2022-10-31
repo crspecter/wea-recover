@@ -202,6 +202,9 @@ func parseParam() (def.InputInfo, error) {
 				return def.InputInfo{}, fmt.Errorf("解析开始位点失败:%s且不是导出模式", *start_position)
 			} else {
 				ty = def.EXPORT_ONLY
+				if *stop_position != "" || *start_datetime != "" || *stop_datetime != "" {
+					fmt.Println("警告: 仅导出数据")
+				}
 			}
 		} else {
 			var binPos def.BinlogPos

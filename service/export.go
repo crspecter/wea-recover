@@ -27,6 +27,13 @@ func checkExportParam(param def.InputInfo) error {
 }
 
 func export(param def.InputInfo) error {
+	mysql.NewConnPool(mysql.DBConfig{
+		Addr:     param.Addr + ":" + strconv.Itoa(param.Port),
+		User:     param.User,
+		Password: param.Pwd,
+		DBName:   param.Db,
+	})
+
 	//重建恢复文件
 	DeleteFile("./", param.Table+"_recover"+".sql")
 	file, ef := CreateAndTruncate("./" + param.Table + "_recover" + ".sql")

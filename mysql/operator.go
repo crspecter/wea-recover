@@ -4,16 +4,17 @@ import (
 	"context"
 	"fmt"
 	"github.com/go-mysql-org/go-mysql/client"
+	"sync"
 	"time"
 	"wea-recover/common"
 )
 
 var Pool *client.Pool
 
-//var oncePool sync.Once
+var oncePool sync.Once
 var TestDBPool *client.Pool
 
-//var onceTestDBPool sync.Once
+var onceTestDBPool sync.Once
 
 type DBConfig struct {
 	Addr     string
@@ -23,19 +24,19 @@ type DBConfig struct {
 }
 
 func NewConnPool(cfg DBConfig) {
-	//oncePool.Do(func() {
-	Pool = client.NewPool(func(format string, args ...interface{}) {
-		common.Infoln(fmt.Sprintf(format, args...))
-	}, 1, 5, 5, cfg.Addr, cfg.User, cfg.Password, cfg.DBName)
-	//})
+	oncePool.Do(func() {
+		Pool = client.NewPool(func(format string, args ...interface{}) {
+			common.Infoln(fmt.Sprintf(format, args...))
+		}, 1, 5, 5, cfg.Addr, cfg.User, cfg.Password, cfg.DBName)
+	})
 }
 
 func NewConnTestPool(cfg DBConfig) {
-	//onceTestDBPool.Do(func() {
-	TestDBPool = client.NewPool(func(format string, args ...interface{}) {
-		common.Infoln("test " + fmt.Sprintf(format, args...))
-	}, 1, 5, 5, cfg.Addr, cfg.User, cfg.Password, "test")
-	//})
+	onceTestDBPool.Do(func() {
+		TestDBPool = client.NewPool(func(format string, args ...interface{}) {
+			common.Infoln("test " + fmt.Sprintf(format, args...))
+		}, 1, 5, 5, cfg.Addr, cfg.User, cfg.Password, "test")
+	})
 }
 
 func GetShowCreateTableSql(tName string) (string, error) {
