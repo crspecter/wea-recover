@@ -54,7 +54,7 @@ func NewRecover(param def.InputInfo) *Recover {
 
 	//5. 构造原始sql文件句柄
 	common.Infoln("new raw sql export fd")
-	file, err := os.OpenFile("raw.sql", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0655)
+	file, err := os.OpenFile("raw.sql", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
 	if err != nil {
 		common.Errorln("打开文件[raw.sql]失败:", err)
 		return nil

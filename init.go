@@ -16,20 +16,20 @@ import (
 )
 
 func parseParam() (def.InputInfo, error) {
-	addr := pflag.StringP("addr", "h", "127.0.0.1", "MySQL IP")
-	port := pflag.IntP("port", "P", 0, "MySQL port")
-	user := pflag.StringP("user", "u", "", "MySQL user")
-	pwd := pflag.StringP("pwd", "p", "", "MySQL password")
-	db := pflag.StringP("db", "D", "", "MySQL database")
-	table := pflag.StringP("table", "t", "", "MySQL table")
+	addr := pflag.StringP("addr", "h", "127.0.0.1", "IP")
+	port := pflag.IntP("port", "P", 0, "端口")
+	user := pflag.StringP("user", "u", "", "用户名")
+	pwd := pflag.StringP("pwd", "p", "", "密码")
+	db := pflag.StringP("db", "D", "", "数据库")
+	table := pflag.StringP("table", "t", "", "表名")
 	//binlog := pflag.StringP("binlog", "", "", "dump模式下起始binlog")
 	binlog_path := pflag.StringP("binlog-path", "", "", "文件模式下,binlog集合目录,eg:/path")
 	start_datetime := pflag.StringP("start-datetime", "", "", "恢复起始时间,eg:2006-01-02_15:04:05")
 	stop_datetime := pflag.StringP("stop-datetime", "", "", "恢复截止时间,eg:2006-01-02_15:04:05")
 	start_position := pflag.StringP("start-position", "", "", "恢复起始位点信息,eg:mysql-bin.001:4")
 	stop_position := pflag.StringP("stop-position", "", "", "恢复截止位点信息,eg:mysql-bin.010")
-	export := pflag.Bool("export", false, "是否导出表到当前目录下export.sql文件中")
-	event_filter := pflag.StringP("event-filter", "", "both", "事件类型过滤,支持update,delete,both(默认)")
+	export := pflag.Bool("export", false, "是否导出表到当前目录下table_recover.sql文件中")
+	event_filter := pflag.StringP("event-filter", "", "both", "事件类型过滤,支持update,delete,both")
 	pflag.Parse()
 
 	*addr = strings.TrimSpace(*addr)
@@ -271,7 +271,7 @@ func run(param def.InputInfo) {
 	var err error
 	//数据恢复
 	if param.Ty != def.EXPORT_ONLY {
-		fmt.Println("开始数据恢复...")
+		fmt.Println("开始数据恢复,原始SQL保存在文件raw.sql...")
 		r := service.NewRecover(param)
 		if r == nil {
 			err = fmt.Errorf("new recover fail")
