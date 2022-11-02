@@ -47,16 +47,16 @@ func init() {
 }
 
 func getPwd() (string, error) {
-	bPwd := false
-	for _, v := range os.Args {
-		if v == "-p" || v == "--pwd" {
-			bPwd = true
-			break
-		}
-	}
-	if bPwd == false {
-		return "", fmt.Errorf("请输入-p/--pwd")
-	}
+	//bPwd := false
+	//for _, v := range os.Args {
+	//	if v == "-p" || v == "--pwd" {
+	//		bPwd = true
+	//		break
+	//	}
+	//}
+	//if bPwd == false {
+	//	return "", fmt.Errorf("请输入-p/--pwd")
+	//}
 
 	fmt.Print("Enter Password: ")
 	bytePassword, err := term.ReadPassword(int(syscall.Stdin))
