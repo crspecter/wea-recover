@@ -47,10 +47,10 @@ func export(param def.InputInfo) error {
 	if err != nil {
 		common.Errorln(fmt.Sprintf("connent export source db failed %v", err.Error()))
 	}
-	table, et := schema.NewTable(conn_src, "test", param.Table+"_recover")
-	if et != nil {
+	table, err := schema.NewTable(conn_src, "test", param.Table+"_recover")
+	if err != nil {
 		common.Errorln(fmt.Sprintf("get schema for %s export source db failed %v", param.Table+"_recover", err.Error()))
-		return et
+		return err
 	}
 
 	if len(table.PKColumns) != 0 {
@@ -89,8 +89,8 @@ func export(param def.InputInfo) error {
 	//查询主循环
 	for nowID <= maxId {
 
-		ret, eq := stmt.Execute(nowID, maxId)
-		if eq != nil {
+		ret, err := stmt.Execute(nowID, maxId)
+		if err != nil {
 			fmt.Sprintf("执行[%s]的查询[%s]出现错误[%v]", table.Name, pSql, err.Error())
 			return err
 		}
