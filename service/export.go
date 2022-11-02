@@ -79,7 +79,7 @@ func export(param def.InputInfo) error {
 		allFiels = append(allFiels, fmt.Sprintf("`%s`", field.Name))
 		fields = append(fields, fmt.Sprintf("`%s`", field.Name))
 	}
-	fields_sql := strings.Join(fields, ",")
+	fields_sql := "(" + strings.Join(fields, ",") + ")"
 	pSql := fmt.Sprintf(`select %s from %s where %s > ? and %s <=?  order by %s limit %d`,
 		fields_sql, table.Name, table.GetPKColumn(0).Name, table.GetPKColumn(0).Name,
 		table.GetPKColumn(0).Name, 1000)
