@@ -15,17 +15,17 @@ import (
 	"wea-recover/service"
 )
 
-func parseParam() (def.InputInfo, error) {
+func parseParam(pwd string) (def.InputInfo, error) {
 	addr := pflag.StringP("addr", "h", "127.0.0.1", "IP")
 	port := pflag.IntP("port", "P", 0, "端口")
 	user := pflag.StringP("user", "u", "", "用户名")
-	pwd := pflag.StringP("pwd", "p", "", "密码")
+	//pwd := pflag.StringP("pwd", "p", "", "密码")
 	db := pflag.StringP("db", "D", "", "数据库")
 	table := pflag.StringP("table", "t", "", "表名")
 	//binlog := pflag.StringP("binlog", "", "", "dump模式下起始binlog")
 	binlog_path := pflag.StringP("binlog-path", "", "", "文件模式下,binlog集合目录,eg:/path")
-	start_datetime := pflag.StringP("start-datetime", "", "", "恢复起始时间,eg:2006-01-02_15:04:05")
-	stop_datetime := pflag.StringP("stop-datetime", "", "", "恢复截止时间,eg:2006-01-02_15:04:05")
+	start_datetime := pflag.StringP("start-datetime", "", "", "恢复起始时间,eg:2006-01-02 15:04:05")
+	stop_datetime := pflag.StringP("stop-datetime", "", "", "恢复截止时间,eg:2006-01-02 15:04:05")
 	start_position := pflag.StringP("start-position", "", "", "恢复起始位点信息,eg:mysql-bin.001:4")
 	stop_position := pflag.StringP("stop-position", "", "", "恢复截止位点信息,eg:mysql-bin.010")
 	export := pflag.Bool("export", false, "是否导出表到当前目录下table_recover.sql文件中")
@@ -34,7 +34,7 @@ func parseParam() (def.InputInfo, error) {
 
 	*addr = strings.TrimSpace(*addr)
 	*user = strings.TrimSpace(*user)
-	*pwd = strings.TrimSpace(*pwd)
+	//*pwd = strings.TrimSpace(*pwd)
 	*db = strings.TrimSpace(*db)
 	*table = strings.TrimSpace(*table)
 	*binlog_path = strings.TrimSpace(*binlog_path)
@@ -66,23 +66,23 @@ func parseParam() (def.InputInfo, error) {
 	}
 
 	if *start_datetime != "" {
-		if _, err := time.Parse("2006-01-02_15:04:05", *start_datetime); err != nil {
-			return def.InputInfo{}, fmt.Errorf("时间格式不正确,eg:2006-01-02_15:04:05")
+		if _, err := time.Parse("2006-01-02 15:04:05", *start_datetime); err != nil {
+			return def.InputInfo{}, fmt.Errorf("时间格式不正确,eg:2006-01-02 15:04:05")
 		}
 	}
 	if *stop_datetime != "" {
-		t, err := time.Parse("2006-01-02_15:04:05", *stop_datetime)
+		t, err := time.Parse("2006-01-02 15:04:05", *stop_datetime)
 		if err != nil {
-			return def.InputInfo{}, fmt.Errorf("时间格式不正确,eg:2006-01-02_15:04:05")
+			return def.InputInfo{}, fmt.Errorf("时间格式不正确,eg:2006-01-02 15:04:05")
 		}
 		cur := time.Now()
 		if cur.Sub(t) < 0 {
-			*stop_datetime = cur.Format("2006-01-02_15:04:05")
+			*stop_datetime = cur.Format("2006-01-02 15:04:05")
 			common.Infoln("stop datetime err use current time:", *stop_datetime)
 			fmt.Println("stop datetime err use current time:", *stop_datetime)
 		}
 	} else {
-		*stop_datetime = time.Now().Format("2006-01-02_15:04:05")
+		*stop_datetime = time.Now().Format("2006-01-02 15:04:05")
 		common.Infoln("auto add stop datetime:", *stop_datetime)
 		fmt.Println("auto add stop datetime:", *stop_datetime)
 	}
@@ -241,7 +241,7 @@ func parseParam() (def.InputInfo, error) {
 		return def.InputInfo{}, fmt.Errorf("解析运行模式失败")
 	}
 
-	conn, err := client.Connect(*addr+":"+strconv.Itoa(*port), *user, *pwd, *db)
+	conn, err := client.Connect(*addr+":"+strconv.Itoa(*port), *user, pwd, *db)
 	if err != nil {
 		return def.InputInfo{}, fmt.Errorf("mysql连接失败:%s", err.Error())
 	}
@@ -253,7 +253,7 @@ func parseParam() (def.InputInfo, error) {
 		Addr:          *addr,
 		Port:          *port,
 		User:          *user,
-		Pwd:           *pwd,
+		Pwd:           pwd,
 		Db:            *db,
 		Table:         *table,
 		Binlogs:       binlogs,

@@ -35,20 +35,21 @@ func (f *filter) Init(param def.InputInfo) error {
 	if param.StartDatetime == "" {
 		f.startDatetime = nil
 	} else {
-		t, _ := time.Parse("2006-01-02_15:04:05", param.StartDatetime)
+		t, _ := time.ParseInLocation("2006-01-02 15:04:05", param.StartDatetime, time.Local)
 		f.startDatetime = &t
 	}
 	if param.StopDatetime == "" {
 		f.stopDatetime = nil
 	} else {
-		t, _ := time.Parse("2006-01-02_15:04:05", param.StopDatetime)
+		t, _ := time.ParseInLocation("2006-01-02 15:04:05", param.StopDatetime, time.Local)
 		f.stopDatetime = &t
 	}
 	return nil
 }
 
 func (f filter) Valid(event *replication.BinlogEvent) bool {
-	if f.startDatetime != nil && int64(event.Header.Timestamp) < f.startDatetime.Unix() {
+	startTimestamp := f.startDatetime.Unix()
+	if f.startDatetime != nil && int64(event.Header.Timestamp) < startTimestamp {
 		return false
 	}
 

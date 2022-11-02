@@ -2,8 +2,10 @@ package main
 
 import (
 	"fmt"
+	"golang.org/x/term"
 	"log"
 	"os"
+	"syscall"
 	"time"
 	"wea-recover/common"
 )
@@ -18,7 +20,13 @@ func main() {
 	common.Infoln("param:", os.Args)
 	common.Infoln("version:", Branch, CommitId, Message)
 
-	param, err := parseParam()
+	pwd, err := getPwd()
+	if err != nil {
+		fmt.Println(err)
+		log.Fatal(err)
+	}
+
+	param, err := parseParam(pwd)
 	if err != nil {
 		fmt.Println(err)
 		log.Fatal(err)
@@ -36,4 +44,27 @@ func init() {
 		log.Panic("打开日志文件异常")
 	}
 	log.SetOutput(logFile)
+}
+
+func getPwd() (string, error) {
+	bPwd := false
+	for _, v := range os.Args {
+		if v == "-p" || v == "--pwd" {
+			bPwd = true
+			break
+		}
+	}
+	if bPwd == false {
+		return "", fmt.Errorf("请输入-p/--pwd")
+	}
+
+	fmt.Print("Enter Password: ")
+	bytePassword, err := term.ReadPassword(int(syscall.Stdin))
+	if err != nil {
+		return "", err
+	}
+
+	password := string(bytePassword)
+	fmt.Println("\n", password)
+	return password, err
 }
