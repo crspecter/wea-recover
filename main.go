@@ -20,13 +20,7 @@ func main() {
 	common.Infoln("param:", os.Args)
 	common.Infoln("version:", Branch, CommitId, Message)
 
-	pwd, err := getPwd()
-	if err != nil {
-		fmt.Println(err)
-		log.Fatal(err)
-	}
-
-	param, err := parseParam(pwd)
+	param, err := parseParam()
 	if err != nil {
 		fmt.Println(err)
 		log.Fatal(err)
@@ -65,6 +59,5 @@ func getPwd() (string, error) {
 	}
 
 	password := string(bytePassword)
-	fmt.Println("\n", password)
 	return password, err
 }

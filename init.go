@@ -15,11 +15,11 @@ import (
 	"wea-recover/service"
 )
 
-func parseParam(pwd string) (def.InputInfo, error) {
+func parseParam() (def.InputInfo, error) {
 	addr := pflag.StringP("addr", "h", "127.0.0.1", "IP")
 	port := pflag.IntP("port", "P", 0, "端口")
 	user := pflag.StringP("user", "u", "", "用户名")
-	//pwd := pflag.StringP("pwd", "p", "", "密码")
+	pwd := pflag.StringP("pwd", "p", "", "密码")
 	db := pflag.StringP("db", "D", "", "数据库")
 	table := pflag.StringP("table", "t", "", "表名")
 	//binlog := pflag.StringP("binlog", "", "", "dump模式下起始binlog")
@@ -34,7 +34,7 @@ func parseParam(pwd string) (def.InputInfo, error) {
 
 	*addr = strings.TrimSpace(*addr)
 	*user = strings.TrimSpace(*user)
-	//*pwd = strings.TrimSpace(*pwd)
+	*pwd = strings.TrimSpace(*pwd)
 	*db = strings.TrimSpace(*db)
 	*table = strings.TrimSpace(*table)
 	*binlog_path = strings.TrimSpace(*binlog_path)
@@ -43,6 +43,14 @@ func parseParam(pwd string) (def.InputInfo, error) {
 	*start_position = strings.TrimSpace(*start_position)
 	*stop_position = strings.TrimSpace(*stop_position)
 	*event_filter = strings.TrimSpace(*event_filter)
+
+	if *pwd == "" {
+		str, err := getPwd()
+		if err != nil {
+			return def.InputInfo{}, fmt.Errorf("密码输入错误:%s", err.Error())
+		}
+		*pwd = str
+	}
 
 	path := *binlog_path
 	if path != "" && path[len(path)-1] != '/' && path[len(path)-1] != '\\' {
@@ -241,7 +249,7 @@ func parseParam(pwd string) (def.InputInfo, error) {
 		return def.InputInfo{}, fmt.Errorf("解析运行模式失败")
 	}
 
-	conn, err := client.Connect(*addr+":"+strconv.Itoa(*port), *user, pwd, *db)
+	conn, err := client.Connect(*addr+":"+strconv.Itoa(*port), *user, *pwd, *db)
 	if err != nil {
 		return def.InputInfo{}, fmt.Errorf("mysql连接失败:%s", err.Error())
 	}
@@ -253,7 +261,7 @@ func parseParam(pwd string) (def.InputInfo, error) {
 		Addr:          *addr,
 		Port:          *port,
 		User:          *user,
-		Pwd:           pwd,
+		Pwd:           *pwd,
 		Db:            *db,
 		Table:         *table,
 		Binlogs:       binlogs,
