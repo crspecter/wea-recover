@@ -57,7 +57,7 @@ func getPwd() (string, error) {
 	if err != nil {
 		return "", err
 	}
-
+	fmt.Print("\n")
 	password := string(bytePassword)
 	return password, err
 }
