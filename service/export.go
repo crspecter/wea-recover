@@ -85,6 +85,9 @@ func export(param def.InputInfo) error {
 		fields_sql, table.Name, table.GetPKColumn(0).Name, table.GetPKColumn(0).Name,
 		table.GetPKColumn(0).Name, 1000)
 	stmt, err := conn_src.Prepare(pSql)
+	if err != nil {
+		fmt.Sprintf("执行PrepareSQL错误:%v, sql:%s]", err.Error(), pSql)
+	}
 
 	nowID := minId - 1
 	//查询主循环
