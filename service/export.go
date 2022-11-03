@@ -47,6 +47,7 @@ func export(param def.InputInfo) error {
 	if err != nil {
 		common.Errorln(fmt.Sprintf("connent export source db failed %v", err.Error()))
 	}
+	conn_src.SetCharset("utf8mb4")
 	table, err := schema.NewTable(conn_src, "test", param.Table+"_recover")
 	if err != nil {
 		common.Errorln(fmt.Sprintf("get schema for %s export source db failed %v", param.Table+"_recover", err.Error()))
