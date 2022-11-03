@@ -27,11 +27,11 @@ func checkExportParam(param def.InputInfo) error {
 }
 
 func export(param def.InputInfo) error {
-	mysql.NewConnPool(mysql.DBConfig{
+	mysql.NewConnTestPool(mysql.DBConfig{
 		Addr:     param.Addr + ":" + strconv.Itoa(param.Port),
 		User:     param.User,
 		Password: param.Pwd,
-		DBName:   param.Db,
+		DBName:   "test",
 	})
 
 	//重建恢复文件
@@ -151,7 +151,7 @@ func export(param def.InputInfo) error {
 func getMaxID(tName string, pk string) (int64, error) {
 	sqlStr := fmt.Sprintf("select %s from %s  order by `%s` desc limit 1", pk, "test."+tName, pk)
 	rsl := int64(0)
-	err := mysql.QueryForRow(sqlStr, &rsl)
+	err := mysql.QueryTestDBForRow(sqlStr, &rsl)
 	if err != nil {
 		return 0, common.Error(tName, "执行sql", sqlStr, "异常", err)
 	}
@@ -163,7 +163,7 @@ func getMinID(tName string, pk string) (int64, error) {
 	sqlStr := fmt.Sprintf("select %s from %s order by `%s`  limit 1", pk, "test."+tName, pk)
 
 	rsl := int64(0)
-	err := mysql.QueryForRow(sqlStr, &rsl)
+	err := mysql.QueryTestDBForRow(sqlStr, &rsl)
 	if err != nil {
 		return 0, common.Error(tName, "执行sql", sqlStr, "异常", err)
 	}

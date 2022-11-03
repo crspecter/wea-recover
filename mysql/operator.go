@@ -140,3 +140,49 @@ func QueryForRow(stmt string, rslData ...interface{}) (err error) {
 	}
 	return
 }
+
+func QueryTestDBForRow(stmt string, rslData ...interface{}) (err error) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
+	defer cancel()
+	conn, err := TestDBPool.GetConn(ctx)
+	if err != nil {
+		return err
+	}
+	defer Pool.PutConn(conn)
+
+	err = conn.Ping()
+	if err != nil {
+		return err
+	}
+	r, err := conn.Execute(stmt)
+	if err != nil {
+		return err
+	}
+	for i := 0; i < r.RowNumber(); i++ {
+		for j := 0; j < r.ColumnNumber() && j < len(rslData); j++ {
+			if rslData[j] == nil {
+				continue
+			}
+			switch v := rslData[j].(type) {
+			case *uint64:
+				*v, err = r.GetUint(i, j)
+				if err != nil {
+					return err
+				}
+			case *int64:
+				*v, err = r.GetInt(i, j)
+				if err != nil {
+					return err
+				}
+			case *string:
+				*v, err = r.GetString(i, j)
+				if err != nil {
+					return err
+				}
+			default:
+				return fmt.Errorf("只支持，nil,*uint64,*int64,*string类型")
+			}
+		}
+	}
+	return
+}
