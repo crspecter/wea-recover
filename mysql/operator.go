@@ -64,6 +64,7 @@ func ExecuteTestDB(stmt string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
 	defer cancel()
 	conn, err := TestDBPool.GetConn(ctx)
+	conn.SetCharset("utf8mb4")
 	if err != nil {
 		return err
 	}
