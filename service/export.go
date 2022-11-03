@@ -82,7 +82,7 @@ func export(param def.InputInfo) error {
 	}
 	fields_sql := "(" + strings.Join(fields, ",") + ")"
 	pSql := fmt.Sprintf(`select %s from %s where %s > ? and %s <=?  order by %s limit %d`,
-		fields_sql, table.Name, table.GetPKColumn(0).Name, table.GetPKColumn(0).Name,
+		strings.Join(fields, ","), table.Name, table.GetPKColumn(0).Name, table.GetPKColumn(0).Name,
 		table.GetPKColumn(0).Name, 1000)
 	stmt, err := conn_src.Prepare(pSql)
 	if err != nil {
