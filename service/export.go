@@ -87,6 +87,8 @@ func export(param def.InputInfo) error {
 	stmt, err := conn_src.Prepare(pSql)
 	if err != nil {
 		fmt.Sprintf("执行PrepareSQL错误:%v, sql:%s]", err.Error(), pSql)
+	} else {
+		fmt.Sprintf("执行PrepareSQL成功 sql:%s]", pSql)
 	}
 
 	nowID := minId - 1
