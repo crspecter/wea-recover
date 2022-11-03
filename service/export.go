@@ -41,7 +41,7 @@ func export(param def.InputInfo) error {
 		return ef
 	}
 	defer file.Close()
-
+	file.WriteString("use test;" + "\n")
 	//链接测试库
 	conn_src, err := client.Connect(param.Addr+":"+strconv.Itoa(param.Port), param.User, param.Pwd, "test")
 	if err != nil {
@@ -140,7 +140,7 @@ func export(param def.InputInfo) error {
 			oneSelect = append(oneSelect, lineValue)
 		}
 		//写入文件
-		sql := toSQL("test."+table.Name+"_recover", fields_sql, oneSelect)
+		sql := toSQL(table.Name, fields_sql, oneSelect)
 		file.WriteString(sql + "\n")
 		file.Sync()
 		ret.Close()
@@ -173,5 +173,8 @@ func getMinID(tName string, pk string) (int64, error) {
 }
 
 func toSQL(table string, field string, value []string) string {
+	if strings.HasSuffix(table, "_recover") {
+		table = table[0 : len(table)-len("_recover")]
+	}
 	return fmt.Sprintf("replace into `%s` %s values %s", table, field, strings.Join(value, ","))
 }
