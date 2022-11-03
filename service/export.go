@@ -86,18 +86,19 @@ func export(param def.InputInfo) error {
 		table.GetPKColumn(0).Name, 1000)
 	stmt, err := conn_src.Prepare(pSql)
 	if err != nil {
-		fmt.Sprintf("执行PrepareSQL错误:%v, sql:%s]", err.Error(), pSql)
+		common.Errorln("执行PrepareSQL错误:%v, sql:%s]", err.Error(), pSql)
+		return err
 	} else {
-		fmt.Sprintf("执行PrepareSQL成功 sql:%s]", pSql)
+		common.Errorln("执行PrepareSQL成功 sql:%s]", pSql)
 	}
 
 	nowID := minId - 1
 	//查询主循环
 	for nowID <= maxId {
-
+		common.Errorln("开始执行导出查询 nowID:%d, maxId;%d]", nowID, maxId)
 		ret, err := stmt.Execute(nowID, maxId)
 		if err != nil {
-			fmt.Sprintf("执行[%s]的查询[%s]出现错误[%v]", table.Name, pSql, err.Error())
+			common.Errorln("执行[%s]的查询[%s]出现错误[%v]", table.Name, pSql, err.Error())
 			return err
 		}
 		if len(ret.Values) == 0 {
