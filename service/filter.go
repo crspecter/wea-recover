@@ -7,6 +7,7 @@ import (
 	"github.com/pingcap/tidb/parser/ast"
 	"github.com/pingcap/tidb/parser/format"
 	_ "github.com/pingcap/tidb/parser/test_driver"
+	"path/filepath"
 	"strings"
 	"time"
 	"wea-recover/common"
@@ -23,6 +24,8 @@ type filter struct {
 	isLastBinlog  bool
 	eventFilter   string
 }
+
+var globalCurrentBinlog = ""
 
 func (f *filter) Init(param def.InputInfo) error {
 	f.db = param.Db
@@ -44,6 +47,8 @@ func (f *filter) Init(param def.InputInfo) error {
 		t, _ := time.ParseInLocation("2006-01-02 15:04:05", param.StopDatetime, time.Local)
 		f.stopDatetime = &t
 	}
+
+	globalCurrentBinlog = filepath.Base(param.Binlogs[0].Binlog)
 	return nil
 }
 
@@ -139,6 +144,7 @@ func (f filter) Valid(event *replication.BinlogEvent) bool {
 			return false
 		}
 	case *replication.RotateEvent:
+		globalCurrentBinlog = string(ev.NextLogName)
 		fmt.Println("rotate binlog:", string(ev.NextLogName), ev.Position)
 		common.Infoln("rotate binlog:", string(ev.NextLogName), ev.Position)
 		return false

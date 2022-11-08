@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/go-mysql-org/go-mysql/replication"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -237,7 +238,7 @@ const (
 func (r *Recover) parseEvent(event *replication.BinlogEvent) error {
 	switch ev := event.Event.(type) {
 	case *replication.RowsQueryEvent:
-		r.exportRawSql(ev.Query)
+		r.exportRawSql(ev.Query, event.Header)
 	case *replication.RowsEvent:
 		switch event.Header.EventType {
 		case replication.UPDATE_ROWS_EVENTv0, replication.UPDATE_ROWS_EVENTv1, replication.UPDATE_ROWS_EVENTv2:
@@ -286,8 +287,12 @@ func (r *Recover) parseEvent(event *replication.BinlogEvent) error {
 	return nil
 }
 
-func (r *Recover) exportRawSql(sql []byte) {
-	_, _ = r.fd.Write(append(sql, '\n'))
+func (r *Recover) exportRawSql(sql []byte, header *replication.EventHeader) {
+	t := time.Unix(int64(header.Timestamp), 0)
+	strTime := t.Format("2006-01-02 15:04:05")
+	pos := globalCurrentBinlog + " " + strconv.Itoa(int(header.LogPos))
+	info := strTime + " " + pos + " " + string(sql)
+	_, _ = r.fd.Write(append([]byte(info), '\n'))
 }
 
 func check(param def.InputInfo) error {

@@ -7,6 +7,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -257,6 +258,17 @@ func parseParam() (def.InputInfo, error) {
 		return def.InputInfo{}, fmt.Errorf("mysql ping失败:%s", err.Error())
 	}
 
+	// windows下测试使用
+	if runtime.GOOS != "windows" {
+		master, err := isMaster(conn)
+		if err != nil {
+			return def.InputInfo{}, fmt.Errorf("mysql 查询失败:%s", err.Error())
+		}
+		if master == false {
+			return def.InputInfo{}, fmt.Errorf("实例必须为master")
+		}
+	}
+
 	ret := def.InputInfo{
 		Addr:          *addr,
 		Port:          *port,
@@ -273,6 +285,17 @@ func parseParam() (def.InputInfo, error) {
 	}
 	common.Infoln(fmt.Sprintf("parse param: %#v", ret))
 	return ret, nil
+}
+
+func isMaster(conn *client.Conn) (bool, error) {
+	rows, err := conn.Execute("show slave status;")
+
+	if err != nil {
+		return false, common.Error("show slave status failed:%v", err.Error())
+	}
+	defer rows.Close()
+
+	return rows.RowNumber() == 0, nil
 }
 
 func run(param def.InputInfo) {
