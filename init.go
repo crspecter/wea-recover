@@ -80,7 +80,8 @@ func parseParam() (def.InputInfo, error) {
 		}
 	}
 	if *stop_datetime != "" {
-		t, err := time.Parse("2006-01-02 15:04:05", *stop_datetime)
+		//t, err := time.Parse("2006-01-02 15:04:05", *stop_datetime)
+		t, err := time.ParseInLocation("2006-01-02 15:04:05", *stop_datetime, time.Local)
 		if err != nil {
 			return def.InputInfo{}, fmt.Errorf("时间格式不正确,eg:2006-01-02 15:04:05")
 		}
@@ -202,6 +203,7 @@ func parseParam() (def.InputInfo, error) {
 			return def.InputInfo{}, fmt.Errorf("获取binlog列表失败")
 		}
 		ty = def.FILE_RECOVER
+		fmt.Println("解析的binlog列表:", binlogs)
 	} else {
 		startPos := strings.Split(*start_position, ":")
 		endPos := strings.Split(*stop_position, ":")
