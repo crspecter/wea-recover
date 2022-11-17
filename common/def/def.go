@@ -13,6 +13,7 @@ type InputInfo struct {
 	Export        bool
 	Ty            RecoverType
 	EventFilter   string
+	PageSize      int
 }
 
 type RecoverType int
