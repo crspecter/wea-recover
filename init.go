@@ -30,6 +30,7 @@ func parseParam() (def.InputInfo, error) {
 	stop_position := pflag.StringP("stop-position", "", "", "恢复截止位点信息,eg:mysql-bin.010")
 	export := pflag.Bool("export", false, "是否导出表到当前目录下table_recover.sql文件中")
 	event_filter := pflag.StringP("event-filter", "", "both", "事件类型过滤,支持update,delete,both")
+	page_size := pflag.IntP("size", "s", 1000, "导出SQL单条replace行数")
 	pflag.Parse()
 
 	*addr = strings.TrimSpace(*addr)
@@ -270,6 +271,7 @@ func parseParam() (def.InputInfo, error) {
 		Export:        *export,
 		Ty:            ty,
 		EventFilter:   *event_filter,
+		PageSize:      *page_size,
 	}
 	common.Infoln(fmt.Sprintf("parse param: %#v", ret))
 	return ret, nil

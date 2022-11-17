@@ -83,7 +83,7 @@ func export(param def.InputInfo) error {
 	fields_sql := "(" + strings.Join(fields, ",") + ")"
 	pSql := fmt.Sprintf(`select %s from %s where %s > ? and %s <=?  order by %s limit %d`,
 		strings.Join(fields, ","), table.Name, table.GetPKColumn(0).Name, table.GetPKColumn(0).Name,
-		table.GetPKColumn(0).Name, 1000)
+		table.GetPKColumn(0).Name, param.PageSize)
 	stmt, err := conn_src.Prepare(pSql)
 	if err != nil {
 		common.Errorln("执行PrepareSQL错误:%v, sql:%s]", err.Error(), pSql)
