@@ -5,6 +5,7 @@ import (
 	"github.com/go-mysql-org/go-mysql/mysql"
 	"github.com/go-mysql-org/go-mysql/replication"
 	"math/rand"
+	"path/filepath"
 	"time"
 	"wea-recover/common"
 	"wea-recover/common/def"
@@ -98,6 +99,7 @@ func (f *fileParser) GetEvent() (*replication.BinlogEvent, error) {
 			return nil, nil
 		}
 		common.Infoln("exchange file:", f.binlogs[f.curPos])
+		globalCurrentBinlog = filepath.Base(f.binlogs[f.curPos].Binlog)
 		err := f.Init(f.binlogs[f.curPos].Binlog, 0)
 		if err != nil {
 			common.Errorln("RunParser err:", err)
