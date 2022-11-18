@@ -98,6 +98,12 @@ func (f *fileParser) GetEvent() (*replication.BinlogEvent, error) {
 			common.Infoln("input file end")
 			return nil, nil
 		}
+
+		if (len(f.binlogs)-1 == f.curPos) && (f.binlogs[f.curPos].Binlog == f.binlogs[0].Binlog) {
+			common.Infoln("input file end")
+			return nil, nil
+		}
+
 		common.Infoln("exchange file:", f.binlogs[f.curPos])
 		globalCurrentBinlog = filepath.Base(f.binlogs[f.curPos].Binlog)
 		err := f.Init(f.binlogs[f.curPos].Binlog, 0)
