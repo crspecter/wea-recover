@@ -141,7 +141,7 @@ func (r *Recover) write() {
 				os.Exit(-1)
 			}
 			count += len(sql.Value)
-			common.Infoln("exec sql:", sqlCmd)
+			//common.Infoln("exec sql:", sqlCmd)
 		}
 	}
 

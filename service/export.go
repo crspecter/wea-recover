@@ -95,7 +95,7 @@ func export(param def.InputInfo) error {
 	nowID := minId - 1
 	//查询主循环
 	for nowID <= maxId {
-		common.Errorln("开始执行导出查询 nowID:%d, maxId;%d]", nowID, maxId)
+		//common.Errorln("开始执行导出查询 nowID:%d, maxId:%d", nowID, maxId)
 		ret, err := stmt.Execute(nowID, maxId)
 		if err != nil {
 			common.Errorln("执行[%s]的查询[%s]出现错误[%v]", table.Name, pSql, err.Error())
