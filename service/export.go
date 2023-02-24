@@ -95,7 +95,7 @@ func export(param def.InputInfo) error {
 	nowID := minId - 1
 	//查询主循环
 	for nowID <= maxId {
-		common.Errorln("开始执行导出查询 nowID:%d, maxId;%d]", nowID, maxId)
+		//common.Errorln("开始执行导出查询 nowID:%d, maxId:%d", nowID, maxId)
 		ret, err := stmt.Execute(nowID, maxId)
 		if err != nil {
 			common.Errorln("执行[%s]的查询[%s]出现错误[%v]", table.Name, pSql, err.Error())
@@ -123,9 +123,14 @@ func export(param def.InputInfo) error {
 				if table.Columns[i].Name == table.GetPKColumn(0).Name {
 					if isNumber {
 						switch pkv := dataI.(type) {
+						//case int, int8, int16, int32, int64,
+						//	uint, uint8, uint16, uint32, uint64, float32, float64:
+						//	nowID = pkv.(int64)
 						case int, int8, int16, int32, int64,
-							uint, uint8, uint16, uint32, uint64, float32, float64:
-							nowID = pkv.(int64)
+							uint, uint8, uint16, uint32, uint64:
+							nowID, _ = strconv.ParseInt(fmt.Sprintf("%v", pkv), 10, 64)
+						case float32, float64:
+							return fmt.Errorf("float32, float64类型主键不支持")
 						}
 					} else {
 						return fmt.Errorf("主键不是数值类型")
