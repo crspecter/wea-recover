@@ -290,7 +290,7 @@ func (r *Recover) parseEvent(event *replication.BinlogEvent) error {
 func (r *Recover) exportRawSql(sql []byte, header *replication.EventHeader) {
 	t := time.Unix(int64(header.Timestamp), 0)
 	strTime := t.Format("2006-01-02 15:04:05")
-	pos := globalCurrentBinlog + " " + strconv.Itoa(int(header.LogPos))
+	pos := globalCurrentBinlog + " " + strconv.Itoa(int(header.LogPos-header.EventSize))
 	info := strTime + " " + pos + " " + string(sql)
 	_, _ = r.fd.Write(append([]byte(info), '\n'))
 }
