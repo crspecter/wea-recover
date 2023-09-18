@@ -2,8 +2,6 @@ package main
 
 import (
 	"fmt"
-	"github.com/go-mysql-org/go-mysql/client"
-	"github.com/spf13/pflag"
 	"log"
 	"net"
 	"os"
@@ -14,6 +12,9 @@ import (
 	"wea-recover/common"
 	"wea-recover/common/def"
 	"wea-recover/service"
+
+	"github.com/go-mysql-org/go-mysql/client"
+	"github.com/spf13/pflag"
 )
 
 func parseParam() (def.InputInfo, error) {
@@ -130,6 +131,9 @@ func parseParam() (def.InputInfo, error) {
 		start := -1
 		end := -1
 		for i, v := range files {
+			if v.IsDir() {
+				continue
+			}
 			if startPos[0] == v.Name() {
 				start = i
 			}
