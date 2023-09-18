@@ -167,6 +167,9 @@ func parseParam() (def.InputInfo, error) {
 		start := -1
 		end := -1
 		for i, v := range files {
+			if v.IsDir() {
+				continue
+			}
 			if startPos[0] == v.Name() {
 				start = i
 			}
@@ -237,6 +240,9 @@ func parseParam() (def.InputInfo, error) {
 				}
 			}
 			v := files[i]
+			if v.IsDir() {
+				continue
+			}
 			binPos.Binlog = path + v.Name()
 			binlogs = append(binlogs, binPos)
 		}
