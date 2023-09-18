@@ -2,8 +2,6 @@ package main
 
 import (
 	"fmt"
-	"github.com/go-mysql-org/go-mysql/client"
-	"github.com/spf13/pflag"
 	"log"
 	"net"
 	"os"
@@ -14,6 +12,9 @@ import (
 	"wea-recover/common"
 	"wea-recover/common/def"
 	"wea-recover/service"
+
+	"github.com/go-mysql-org/go-mysql/client"
+	"github.com/spf13/pflag"
 )
 
 func parseParam() (def.InputInfo, error) {
@@ -45,6 +46,42 @@ func parseParam() (def.InputInfo, error) {
 	*start_position = strings.TrimSpace(*start_position)
 	*stop_position = strings.TrimSpace(*stop_position)
 	*event_filter = strings.TrimSpace(*event_filter)
+
+	if *addr != "" {
+		fmt.Printf("get addr:%v", *addr)
+	}
+	if *user != "" {
+		fmt.Printf("get user:%v", *user)
+	}
+	if *pwd != "" {
+		fmt.Printf("get pwd:%v", *pwd)
+	}
+	if *db != "" {
+		fmt.Printf("get db:%v", *db)
+	}
+	if *table != "" {
+		fmt.Printf("get table:%v", *table)
+	}
+	if *binlog_path != "" {
+		fmt.Printf("get binlog_path:%v", *binlog_path)
+	}
+	if *start_datetime != "" {
+		fmt.Printf("get start_datetime:%v", *start_datetime)
+	}
+	if *stop_datetime != "" {
+		fmt.Printf("get stop_datetime:%v", *stop_datetime)
+	}
+	if *start_position != "" {
+		fmt.Printf("get start_position:%v", *start_position)
+	}
+	if *stop_position != "" {
+		fmt.Printf("get stop_position:%v", *stop_position)
+	}
+	if *event_filter != "" {
+		fmt.Printf("get event_filter:%v", *event_filter)
+	}
+	fmt.Printf("get export:%v", *export)
+	fmt.Printf("get page_size:%v", *page_size)
 
 	if *pwd == "" {
 		str, err := getPwd()
@@ -166,15 +203,18 @@ func parseParam() (def.InputInfo, error) {
 				}
 				binlogs = append(binlogs, binPos)
 
-				binPos.Binlog = path + endPos[0]
-				if len(endPos) > 1 {
-					num, err := strconv.Atoi(endPos[1])
-					if err != nil {
-						return def.InputInfo{}, fmt.Errorf("解析结束位点失败:%s", *stop_position)
+				if *stop_position != "" {
+					binPos.Binlog = path + endPos[0]
+					if len(endPos) > 1 {
+						num, err := strconv.Atoi(endPos[1])
+						if err != nil {
+							return def.InputInfo{}, fmt.Errorf("解析结束位点失败:%s", *stop_position)
+						}
+						binPos.Pos = uint32(num)
 					}
-					binPos.Pos = uint32(num)
+					binlogs = append(binlogs, binPos)
 				}
-				binlogs = append(binlogs, binPos)
+
 				break
 			}
 
