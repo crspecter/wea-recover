@@ -201,6 +201,9 @@ func parseParam() (def.InputInfo, error) {
 				}
 			}
 			v := files[i]
+			if v.IsDir() {
+				continue
+			}
 			binPos.Binlog = path + v.Name()
 			binlogs = append(binlogs, binPos)
 		}
