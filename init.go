@@ -194,7 +194,6 @@ func parseParam() (def.InputInfo, error) {
 		//筛选出待解析的binlog及位点信息
 		for i := start; i <= end; i++ {
 			var binPos def.BinlogPos
-
 			if start == end {
 				binPos.Binlog = path + startPos[0]
 				if len(startPos) > 1 {
@@ -240,9 +239,6 @@ func parseParam() (def.InputInfo, error) {
 				}
 			}
 			v := files[i]
-			if v.IsDir() {
-				continue
-			}
 			binPos.Binlog = path + v.Name()
 			binlogs = append(binlogs, binPos)
 		}
