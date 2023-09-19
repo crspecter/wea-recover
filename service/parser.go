@@ -2,14 +2,15 @@ package service
 
 import (
 	"context"
-	"github.com/go-mysql-org/go-mysql/mysql"
-	"github.com/go-mysql-org/go-mysql/replication"
 	"math/rand"
 	"path/filepath"
 	"time"
 	"wea-recover/common"
 	"wea-recover/common/def"
 	parser2 "wea-recover/parser"
+
+	"github.com/go-mysql-org/go-mysql/mysql"
+	"github.com/go-mysql-org/go-mysql/replication"
 )
 
 type parser interface {
@@ -111,16 +112,18 @@ func (f *fileParser) GetEvent() (*replication.BinlogEvent, error) {
 			common.Errorln("RunParser err:", err)
 			return nil, common.Error("RunParser err:", err)
 		}
-	} else if len(f.binlogs)-1 == f.curPos && f.binlogs[f.curPos].Pos != 0 {
+		return parser2.GetFileEvent(), nil
+	} else if len(f.binlogs)-1 == f.curPos && f.binlogs[f.curPos].Pos != 0 && event.Header.LogPos > f.binlogs[f.curPos].Pos {
 		//最后一个binlog,并且设置了截止位点
-		if event.Header.LogPos > f.binlogs[f.curPos].Pos {
-			common.Infoln("input file end")
-			return nil, nil
-		}
+		common.Infoln("input file end")
+		return nil, nil
+	} else if len(f.binlogs) == 2 && f.binlogs[0].Binlog == f.binlogs[1].Binlog && event.Header.LogPos > f.binlogs[1].Pos {
+		//起止的文件是一个，只是位点不同
+		common.Infoln("input file end")
+		return nil, nil
 	} else {
 		return event, nil
 	}
-	return parser2.GetFileEvent(), nil
 }
 
 type dumpParser struct {

@@ -48,40 +48,40 @@ func parseParam() (def.InputInfo, error) {
 	*event_filter = strings.TrimSpace(*event_filter)
 
 	if *addr != "" {
-		fmt.Printf("get addr:%v", *addr)
+		fmt.Printf("addr:%v\n", *addr)
 	}
 	if *user != "" {
-		fmt.Printf("get user:%v", *user)
+		fmt.Printf("user:%v\n", *user)
 	}
 	if *pwd != "" {
-		fmt.Printf("get pwd:%v", *pwd)
+		fmt.Printf("pwd:%v\n", *pwd)
 	}
 	if *db != "" {
-		fmt.Printf("get db:%v", *db)
+		fmt.Printf("db:%v\n", *db)
 	}
 	if *table != "" {
-		fmt.Printf("get table:%v", *table)
+		fmt.Printf("table:%v\n", *table)
 	}
 	if *binlog_path != "" {
-		fmt.Printf("get binlog_path:%v", *binlog_path)
+		fmt.Printf("binlog_path:%v\n", *binlog_path)
 	}
 	if *start_datetime != "" {
-		fmt.Printf("get start_datetime:%v", *start_datetime)
+		fmt.Printf("start_datetime:%v\n", *start_datetime)
 	}
 	if *stop_datetime != "" {
-		fmt.Printf("get stop_datetime:%v", *stop_datetime)
+		fmt.Printf("stop_datetime:%v\n", *stop_datetime)
 	}
 	if *start_position != "" {
-		fmt.Printf("get start_position:%v", *start_position)
+		fmt.Printf("start_position:%v\n", *start_position)
 	}
 	if *stop_position != "" {
-		fmt.Printf("get stop_position:%v", *stop_position)
+		fmt.Printf("stop_position:%v\n", *stop_position)
 	}
 	if *event_filter != "" {
-		fmt.Printf("get event_filter:%v", *event_filter)
+		fmt.Printf("event_filter:%v\n", *event_filter)
 	}
-	fmt.Printf("get export:%v", *export)
-	fmt.Printf("get page_size:%v", *page_size)
+	fmt.Printf("export:%v\n", *export)
+	fmt.Printf("page_size:%v\n", *page_size)
 
 	if *pwd == "" {
 		str, err := getPwd()
@@ -215,6 +215,11 @@ func parseParam() (def.InputInfo, error) {
 						binPos.Pos = uint32(num)
 					}
 					binlogs = append(binlogs, binPos)
+				} else {
+					binPos.Binlog = path + startPos[0]
+					file, _ := os.Stat(binPos.Binlog)
+					binPos.Pos = uint32(file.Size())
+					binlogs = append(binlogs, binPos)
 				}
 
 				break
@@ -246,6 +251,9 @@ func parseParam() (def.InputInfo, error) {
 			return def.InputInfo{}, fmt.Errorf("获取binlog列表失败")
 		}
 		ty = def.FILE_RECOVER
+		if start == end && len(binlogs) == 2 && binlogs[1].Pos == 0 {
+			fmt.Println("解析的binlog列表:", binlogs[0])
+		}
 		fmt.Println("解析的binlog列表:", binlogs)
 	} else {
 		startPos := strings.Split(*start_position, ":")
@@ -295,22 +303,24 @@ func parseParam() (def.InputInfo, error) {
 		return def.InputInfo{}, fmt.Errorf("解析运行模式失败")
 	}
 
-	conn, err := client.Connect(*addr+":"+strconv.Itoa(*port), *user, *pwd, *db)
-	if err != nil {
-		return def.InputInfo{}, fmt.Errorf("mysql连接失败:%s", err.Error())
-	}
-	if err := conn.Ping(); err != nil {
-		return def.InputInfo{}, fmt.Errorf("mysql ping失败:%s", err.Error())
-	}
-
-	// windows下测试使用
-	if runtime.GOOS != "windows" {
-		master, err := isMaster(conn)
+	// dump模式才需要连接mysql
+	if path == "" {
+		conn, err := client.Connect(*addr+":"+strconv.Itoa(*port), *user, *pwd, *db)
 		if err != nil {
-			return def.InputInfo{}, fmt.Errorf("mysql 查询失败:%s", err.Error())
+			return def.InputInfo{}, fmt.Errorf("mysql连接失败:%s", err.Error())
 		}
-		if master == false {
-			return def.InputInfo{}, fmt.Errorf("实例必须为master")
+		if err := conn.Ping(); err != nil {
+			return def.InputInfo{}, fmt.Errorf("mysql ping失败:%s", err.Error())
+		}
+		// windows下测试使用
+		if runtime.GOOS != "windows" {
+			master, err := isMaster(conn)
+			if err != nil {
+				return def.InputInfo{}, fmt.Errorf("mysql 查询失败:%s", err.Error())
+			}
+			if master == false {
+				return def.InputInfo{}, fmt.Errorf("实例必须为master")
+			}
 		}
 	}
 
