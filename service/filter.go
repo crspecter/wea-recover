@@ -2,16 +2,17 @@ package service
 
 import (
 	"fmt"
-	"github.com/go-mysql-org/go-mysql/replication"
-	pingcapparser "github.com/pingcap/tidb/parser"
-	"github.com/pingcap/tidb/parser/ast"
-	"github.com/pingcap/tidb/parser/format"
-	_ "github.com/pingcap/tidb/parser/test_driver"
 	"path/filepath"
 	"strings"
 	"time"
 	"wea-recover/common"
 	"wea-recover/common/def"
+
+	"github.com/go-mysql-org/go-mysql/replication"
+	pingcapparser "github.com/pingcap/tidb/parser"
+	"github.com/pingcap/tidb/parser/ast"
+	"github.com/pingcap/tidb/parser/format"
+	_ "github.com/pingcap/tidb/parser/test_driver"
 )
 
 type filter struct {
@@ -60,7 +61,7 @@ func (f filter) Valid(event *replication.BinlogEvent) bool {
 		}
 	}
 
-	//只处理RowsQueryEvent,UPDATE_ROWS_EVENTv0与DELETE_ROWS_EVENTv0
+	//只处理RowsQueryEvent,UPDATE_ROWS_EVENTv0与DELETE_ROWS_EVENTv0+InsertStmt
 	switch ev := event.Event.(type) {
 	case *replication.RowsQueryEvent:
 		//TODO:待测试,复杂sql时是否能正常工作
@@ -120,7 +121,31 @@ func (f filter) Valid(event *replication.BinlogEvent) bool {
 				} else {
 					return false
 				}
+			case *ast.InsertStmt:
+				if f.eventFilter == "both" {
+					return false
+				}
+
+				_ = v.Table.Restore(&format.RestoreCtx{
+					Flags: format.DefaultRestoreFlags,
+					In:    sql,
+				})
+				arr := strings.Split(sql.ToString(), ".")
+				if len(arr) == 1 {
+					if arr[0] == fmt.Sprintf("`%s`", f.table) {
+						common.Infoln("原始sql:", string(ev.Query))
+						return true
+					}
+				} else if len(arr) == 2 {
+					if arr[1] == fmt.Sprintf("`%s`", f.table) {
+						common.Infoln("原始sql:", string(ev.Query))
+						return true
+					}
+				} else {
+					return false
+				}
 			}
+
 		}
 
 		return false
