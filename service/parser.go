@@ -119,7 +119,7 @@ func (f *fileParser) GetEvent() (*replication.BinlogEvent, error) {
 		return nil, nil
 	} else if len(f.binlogs) == 2 && f.binlogs[0].Binlog == f.binlogs[1].Binlog && event.Header.LogPos > f.binlogs[1].Pos {
 		//起止的文件是一个，只是位点不同
-		common.Infoln("input file end")
+		common.Infoln("input file end ")
 		return nil, nil
 	} else {
 		return event, nil
