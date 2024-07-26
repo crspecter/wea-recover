@@ -2,6 +2,13 @@
 
 #### 介绍
 
+Wea-recover是一个MySQL数据库恢复工具，可以完成读取binlog文件中的update,delete语句，进行反向SQL生成。
+1.配置访问数据库的账号需要replication slave,replication client，需要能创建数据库。
+2.恢复的数据过程会在源端创建'test'数据库并创建数据恢复表
+3.会在本地输出2份文件，一份是用于恢复的SQL文件，一份是通过binlog中的RowsQueryEvent输出的原始语句可以作为误操作依据
+4.可以配置本地binlog解析模式，在源端MySQL无法操作时进行数据恢复
+5.如果同一行在设置的恢复时间段被修改多次，会仅保留第一次修改的前镜像
+
 通过binlog起始文件名+起止时间段，导出指定表在某时间段被修改的前镜像，导出SQL文件为DBA提供数据恢复依据。
 
 #### 示例
